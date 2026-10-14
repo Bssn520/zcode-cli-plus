@@ -46,6 +46,11 @@ jobs:
       - run: pnpm --filter zcode-cli build
       - name: Prepare npm package (@bssn520/zcode-cli-plus)
         run: node tools/prepare-npm-package.mjs .npm-package
+      - name: Verify packed npm package (global install + TUI)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tmux
+          bash tools/verify-npm-package.sh .npm-package
       - name: Decide provenance
         id: prov
         env:
