@@ -4,9 +4,20 @@
 | --- | --- |
 | `sync-upstream.sh` | 从上游 `zai-org/ZCode` 检出里抽取 CLI 精简切片到目标仓库 |
 | `derive-cli-lockfile.mjs` | 从根 `pnpm-lock.yaml` 派生 `apps/zcode-cli/pnpm-lock.yaml`（turbo 根） |
-| `prepare-npm-package.mjs` | 组装发布目录 `.npm-package/`（读 `npm/package.json`） |
-
+| `prepare-npm-package.mjs` | 组装发布目录 `.npm-package/`（读 `npm/package.json`）；改写 `dist/zcode.cjs` 注入发布版 `version` 与 `bin` 命令名 |
 门禁脚本与已知失败清单在 `ci/`（fork 资产），不在本目录。
+
+## 发布包 branding 注入
+
+上游 CLI 构建（`apps/zcode-cli/packages/cli/scripts/build.mjs`）会把 `apps/zcode-cli/package.json` 的 version 写成 `__CLI_VERSION__`，命令名来自 `CLI_COMMAND_NAME = "zcode"`（`process-name.ts`）和 i18n help 文案。本地 `pnpm --filter zcode-cli build` 产物因此仍是上游的 `zcode` / 上游版本。
+
+`prepare-npm-package.mjs` 在组装 `.npm-package/` 时，对复制后的 `dist/zcode.cjs` 做字面量替换（次数不匹配即抛错）：
+
+- 把上游 version 的 3 处 `__CLI_VERSION__` 字面量换成 `npm/package.json` 的 version（`--version` + 两处 runtime 缓存目录）
+- 把 `CLI_COMMAND_NAME`、help banner/usage、中英文 help 正文、子命令 `Usage: zcode …` 换成 `npm/package.json` 唯一的 `bin` 名（当前为 `zcp`）
+- 跑一遍准备好的 bundle 的 `--version` / `--help` 做冒烟校验
+
+不改 `apps/` 源码，因此 `tools/sync-upstream.sh` 不受影响。若上游打包后的字面量形态变了，prepare 会失败，需按新产物更新替换模式。
 
 ## 同步上游新版本
 
