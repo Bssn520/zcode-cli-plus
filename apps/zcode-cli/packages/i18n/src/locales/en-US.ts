@@ -373,11 +373,11 @@ Slash Commands:
       previewHeading: "Preview",
       editedBadge: "edited",
       noteMarker: "note",
-      stepCount: (count) => `${count} steps`,
-      commentCount: (count) => `${count} comments`,
+      stepCount: (count) => `${count} ${count === 1 ? "step" : "steps"}`,
+      commentCount: (count) => `${count} ${count === 1 ? "comment" : "comments"}`,
       help: (commentCount) =>
         commentCount > 0
-          ? `Ctrl+G edit · f step comment · g overall · r review · Enter send feedback (${commentCount} comments) · Esc cancel · j/k select`
+          ? `Ctrl+G edit · f step comment · g overall · r review · Enter send feedback (${commentCount} ${commentCount === 1 ? "comment" : "comments"}) · Esc cancel · j/k select`
           : "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select",
       commentStepTitle: (index) => `Feedback on step ${index}`,
       commentOverallTitle: "Overall plan feedback",
