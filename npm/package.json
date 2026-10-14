@@ -1,0 +1,22 @@
+{
+  "name": "@bssn520/zcode-cli-plus",
+  "version": "0.1.0",
+  "description": "Community-maintained, unofficial fork of the ZCode CLI (zai-org/ZCode). Not an official Z.AI product.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bssn520/zcode-cli-plus.git"
+  },
+  "homepage": "https://github.com/Bssn520/zcode-cli-plus#readme",
+  "bugs": "https://github.com/Bssn520/zcode-cli-plus/issues",
+  "bin": {
+    "zcp": "./dist/zcode.cjs"
+  },
+  "files": ["dist", "LICENSE", "NOTICE.md", "THIRD-PARTY-NOTICES.md", "UPSTREAM_TAG", "README.md"],
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
