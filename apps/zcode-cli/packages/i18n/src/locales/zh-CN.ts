@@ -380,6 +380,8 @@ Slash Commands:
       reviewHelp: "Enter 发送意见 · d 删除 · Esc 返回 · j/k 选择",
       stepCommentSummary: ({ index, label, text }) => `[步骤 ${index}] ${label}：${text}`,
       overallCommentSummary: (text) => `[整体] ${text}`,
+      editorNotFound: "未找到编辑器：请设置 $VISUAL 或 $EDITOR",
+      editorFailed: (message) => `无法打开编辑器：${message}`,
     },
   },
 };

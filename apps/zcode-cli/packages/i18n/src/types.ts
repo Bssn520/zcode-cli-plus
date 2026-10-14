@@ -324,5 +324,7 @@ export interface TuiCopy {
     reviewHelp: string;
     stepCommentSummary(input: { index: number; label: string; text: string }): string;
     overallCommentSummary(text: string): string;
+    editorNotFound: string;
+    editorFailed(message: string): string;
   };
 }

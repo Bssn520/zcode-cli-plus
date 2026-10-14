@@ -383,6 +383,8 @@ Slash Commands:
       reviewHelp: "Enter send feedback · d delete · Esc back · j/k select",
       stepCommentSummary: ({ index, label, text }) => `[step ${index}] ${label}: ${text}`,
       overallCommentSummary: (text) => `[general] ${text}`,
+      editorNotFound: "No editor found: set $VISUAL or $EDITOR",
+      editorFailed: (message) => `Could not open editor: ${message}`,
     },
   },
 };

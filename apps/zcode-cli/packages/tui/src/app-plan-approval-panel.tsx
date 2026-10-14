@@ -150,6 +150,9 @@ export function PlanApprovalPanelView({
   headerRows.push(textRow("preview-h", text.previewHeading, palette.muted));
 
   const footerRows: React.ReactElement[] = [];
+  if (state.statusMessage) {
+    footerRows.push(textRow("status", state.statusMessage, palette.warning));
+  }
   const footerBits = [
     edited ? text.editedBadge : undefined,
     parsed.steps.length > 0 ? text.stepCount(parsed.steps.length) : undefined,

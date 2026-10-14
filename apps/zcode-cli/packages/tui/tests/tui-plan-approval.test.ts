@@ -16,7 +16,8 @@ import {
   handlePlanApprovalKey,
 } from "../src/app-plan-approval-state.js";
 import { parsePlanPreview } from "../src/app-plan-parse.js";
-import { splitEditorCommand } from "../src/app-plan-editor.js";
+import { editPlanInExternalEditor, splitEditorCommand } from "../src/app-plan-editor.js";
+import { createSuspendTerminal } from "../src/suspend-terminal.js";
 import { displayWidth } from "../src/app-terminal-width.js";
 const SAMPLE_PLAN = `## Steps
 1. Update service boundary
@@ -396,6 +397,111 @@ test("splitEditorCommand keeps editor args", () => {
   assert.deepEqual(splitEditorCommand('"nano -S" ignored'), ["nano -S", "ignored"]);
 });
 
+test("resume reapplies terminal size after external editor", () => {
+  const applied: Array<[number, number]> = [];
+  let resumed = false;
+  let repainted = false;
+  const suspendTerminal = createSuspendTerminal(
+    {
+      processResize(width: number, height: number) {
+        applied.push([width, height]);
+      },
+      requestFullRepaintRender() {
+        repainted = true;
+      },
+      resume() {
+        resumed = true;
+      },
+      suspend() {},
+    } as Parameters<typeof createSuspendTerminal>[0],
+    () => ({ columns: 140, rows: 45 }),
+  );
+
+  suspendTerminal.suspend();
+  suspendTerminal.resume();
+
+  assert.equal(resumed, true);
+  assert.deepEqual(applied, [[140, 45]]);
+  assert.equal(repainted, true);
+});
+
+test("Ctrl+G editor error surfaces in status line and panel", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  let status = "";
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ message: "spawnSync vim ENOENT", status: "error" }),
+      locale: "en-US",
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  assert.match(status, /Could not open editor:.*ENOENT/u);
+  assert.equal(harness.state.statusMessage, status);
+
+  const panelText = collectTextNodes(
+    PlanApprovalPanelView({ state: harness.state }),
+  )
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Could not open editor:.*ENOENT/u);
+
+  harness.press("j");
+  assert.equal(harness.state.statusMessage, undefined);
+});
+
+test("Ctrl+G missing editor shows locale hint in panel", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  let status = "";
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({
+        kind: "not_found",
+        message: "spawnSync vi ENOENT",
+        status: "error",
+      }),
+      locale: "zh-CN",
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  assert.equal(status, "未找到编辑器：请设置 $VISUAL 或 $EDITOR");
+  assert.equal(harness.state.statusMessage, status);
+});
+
+test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
+  const missing = editPlanInExternalEditor({
+    env: {},
+    plan: SAMPLE_PLAN,
+    spawnSyncFn: () => {
+      const error = new Error("spawnSync vi ENOENT") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      return { error, status: null, signal: null };
+    },
+  });
+  assert.equal(missing.status, "error");
+  if (missing.status === "error") {
+    assert.equal(missing.kind, "not_found");
+  }
+
+  const failedExit = editPlanInExternalEditor({
+    env: { EDITOR: "vim" },
+    plan: SAMPLE_PLAN,
+    spawnSyncFn: () => ({ error: undefined, status: 2, signal: null }),
+  });
+  assert.equal(failedExit.status, "error");
+  if (failedExit.status === "error") {
+    assert.match(failedExit.message, /exited with status 2/u);
+    assert.equal(failedExit.kind, undefined);
+  }
+});
+
 function createHarness(plan: string): {
   readonly result: PermissionBrokerResult | undefined;
   readonly state: NonNullable<ApprovalPrompt["planApprovalState"]>;
@@ -403,6 +509,7 @@ function createHarness(plan: string): {
     name: string,
     mods?: { ctrl?: boolean; meta?: boolean; shift?: boolean },
     options?: Parameters<typeof handlePlanApprovalKey>[4],
+    setStatus?: (status: string) => void,
   ) => void;
 } {
   let result: PermissionBrokerResult | undefined;
@@ -431,7 +538,7 @@ function createHarness(plan: string): {
       assert.ok(current?.planApprovalState);
       return current.planApprovalState;
     },
-    press(name, mods = {}, options) {
+    press(name, mods = {}, options, setStatus = () => undefined) {
       const current = queue[0];
       assert.ok(current);
       handlePlanApprovalKey(
@@ -444,7 +551,7 @@ function createHarness(plan: string): {
         } as KeyEvent,
         current,
         setQueue,
-        () => undefined,
+        setStatus,
         options,
       );
     },

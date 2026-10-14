@@ -13,7 +13,7 @@ export type EditPlanResult =
   | { plan: string; status: "updated" }
   | { status: "unchanged" }
   | { status: "empty" }
-  | { message: string; status: "error" };
+  | { kind?: "not_found"; message: string; status: "error" };
 
 type SpawnSyncFn = (
   command: string,
@@ -85,10 +85,19 @@ export function editPlanInExternalEditor(input: {
     suspended = true;
     const result = spawn(command, [...editorArgs, filePath], { env, stdio: "inherit" });
     if (result.error) {
+      const configured = Boolean(env.VISUAL?.trim() || env.EDITOR?.trim());
+      const notFound =
+        "code" in result.error && (result.error as NodeJS.ErrnoException).code === "ENOENT";
+      if (!configured && notFound) {
+        return { kind: "not_found", message: result.error.message, status: "error" };
+      }
       return { message: result.error.message, status: "error" };
     }
     if (result.status !== 0 && result.status !== null) {
-      // Non-zero exit: still accept content changes if present.
+      return {
+        message: `editor exited with status ${result.status}`,
+        status: "error",
+      };
     }
 
     const edited = readFileSync(filePath, "utf8");
