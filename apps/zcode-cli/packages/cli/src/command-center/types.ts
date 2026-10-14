@@ -249,7 +249,10 @@ export type CommandCenterApp = {
     workId: string;
     name?: string;
   }): Promise<DynamicWorkflowRunResumeResult>;
-  forkFromCheckpoint?(options?: { targetCheckpointId?: string }): Promise<CommandCenterForkResult>;
+  forkFromCheckpoint?(options?: {
+    targetCheckpointId?: string;
+    targetMessageId?: string;
+  }): Promise<CommandCenterForkResult>;
   recallPreviousInputHistory?(
     skip?: number,
   ): Promise<{ attachments?: TuiPromptAttachment[]; text: string } | null>;
@@ -299,7 +302,10 @@ export type CommandCenterApp = {
 };
 
 export type CommandCenterDeps = {
-  forkApp?: (targetCheckpointId?: string) => Promise<CommandCenterForkResult>;
+  forkApp?: (options?: {
+    targetCheckpointId?: string;
+    targetMessageId?: string;
+  }) => Promise<CommandCenterForkResult>;
   getApp(): Promise<CommandCenterApp>;
   getLocale?: () => TuiSubmitPromptResult["locale"];
   getMode?: () => CommandCenterMode;

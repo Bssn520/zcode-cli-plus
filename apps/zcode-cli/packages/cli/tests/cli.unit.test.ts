@@ -2283,7 +2283,10 @@ test("wires TUI fork command into a new active app", async () => {
       const appSessionId = options?.sessionId ?? "sess_parent";
       createdSessionIds.push(options?.sessionId);
       return {
-        forkFromCheckpoint: async (forkOptions?: { targetCheckpointId?: string }) => {
+        forkFromCheckpoint: async (forkOptions?: {
+          targetCheckpointId?: string;
+          targetMessageId?: string;
+        }) => {
           forkTarget = forkOptions?.targetCheckpointId;
           return {
             checkpoint: {} as never,
@@ -3400,10 +3403,10 @@ test("command center opens a checkpoint picker for bare rewind", async () => {
 });
 
 test("command center forks and switches the active app", async () => {
-  let forkTarget: string | undefined;
+  let forkTarget: { targetCheckpointId?: string; targetMessageId?: string } | undefined;
   const submitPrompt = createCommandCenter({
-    forkApp: async (targetCheckpointId) => {
-      forkTarget = targetCheckpointId;
+    forkApp: async (options) => {
+      forkTarget = options;
       return {
         forkedSessionId: "sess_child",
         response: "Forked session sess_child",
@@ -3429,7 +3432,7 @@ test("command center forks and switches the active app", async () => {
     abortSignal: new AbortController().signal,
   });
 
-  assert.equal(forkTarget, "checkpoint_1");
+  assert.deepEqual(forkTarget, { targetCheckpointId: "checkpoint_1" });
   assert.equal(result.response, "Forked session sess_child");
 });
 
@@ -3475,6 +3478,205 @@ test("command center opens a checkpoint picker for bare fork", async () => {
   assert.equal(result.selection?.placement, undefined);
   assert.equal(result.selection?.items[0]?.command, "/fork checkpoint_1");
 });
+
+test("command center opens an assistant message picker for /fork msg", async () => {
+  let forkCalled = false;
+  const submitPrompt = createCommandCenter({
+    forkApp: async () => {
+      forkCalled = true;
+      throw new Error("fork should not run");
+    },
+    getApp: async () =>
+      ({
+        loadSessionTranscript: async () => [
+          { id: "msg_user", role: "user", content: "write tests" },
+          {
+            id: "msg_agent_1",
+            role: "agent",
+            content: "I added coverage for the fork message picker.",
+          },
+        ],
+        sessionId: "sess_active",
+        traceId: "trace-active",
+        resume: async () => {
+          throw new Error("resume should not run");
+        },
+        submitPrompt: async () => {
+          throw new Error("prompt should not run");
+        },
+      }) as never,
+    resumeApp: async () => {
+      throw new Error("resume should not run");
+    },
+  });
+
+  const result = await submitPrompt("/fork msg", {
+    abortSignal: new AbortController().signal,
+  });
+
+  assert.equal(forkCalled, false);
+  assert.equal(result.selection?.title, "Fork From Assistant Reply");
+  assert.equal(result.selection?.placement, "composer");
+  assert.match(result.selection?.items[0]?.primary ?? "", /coverage for the fork/);
+  assert.equal(result.selection?.items[0]?.command, "/fork msg_agent_1");
+});
+
+test("command center opens generic confirm for /fork msg_<id> without forking", async () => {
+  let forkCalled = false;
+  const submitPrompt = createCommandCenter({
+    forkApp: async () => {
+      forkCalled = true;
+      throw new Error("fork should not run before confirm");
+    },
+    getApp: async () =>
+      ({
+        sessionId: "sess_active",
+        traceId: "trace-active",
+        resume: async () => {
+          throw new Error("resume should not run");
+        },
+        submitPrompt: async () => {
+          throw new Error("prompt should not run");
+        },
+      }) as never,
+    resumeApp: async () => {
+      throw new Error("resume should not run");
+    },
+  });
+
+  const result = await submitPrompt("/fork msg_agent_1", {
+    abortSignal: new AbortController().signal,
+  });
+
+  assert.equal(forkCalled, false);
+  assert.equal(result.selection?.title, "Confirm Fork");
+  assert.equal(result.selection?.selectedIndex, 0);
+  assert.equal(result.selection?.items[0]?.primary, "Cancel");
+  assert.equal(result.selection?.items[0]?.command, "/fork msg_agent_1 --cancel");
+  assert.equal(result.selection?.items[1]?.command, "/fork msg_agent_1 --confirm");
+  assert.match(result.selection?.prompt ?? "", /roll back workspace files/i);
+});
+
+test("command center cancel keeps files untouched and does not fork", async () => {
+  let forkCalled = false;
+  const submitPrompt = createCommandCenter({
+    forkApp: async () => {
+      forkCalled = true;
+      throw new Error("fork should not run on cancel");
+    },
+    getApp: async () =>
+      ({
+        sessionId: "sess_active",
+        traceId: "trace-active",
+        resume: async () => {
+          throw new Error("resume should not run");
+        },
+        submitPrompt: async () => {
+          throw new Error("prompt should not run");
+        },
+      }) as never,
+    resumeApp: async () => {
+      throw new Error("resume should not run");
+    },
+  });
+
+  const result = await submitPrompt("/fork msg_agent_1 --cancel", {
+    abortSignal: new AbortController().signal,
+  });
+
+  assert.equal(forkCalled, false);
+  assert.equal(result.response, "Fork cancelled.");
+  assert.equal(result.selection, undefined);
+});
+
+test("command center confirmed message fork calls forkApp with targetMessageId", async () => {
+  let forkTarget: { targetCheckpointId?: string; targetMessageId?: string } | undefined;
+  const submitPrompt = createCommandCenter({
+    forkApp: async (options) => {
+      forkTarget = options;
+      return {
+        forkedSessionId: "sess_child",
+        response: "Forked session sess_child",
+      };
+    },
+    getApp: async () =>
+      ({
+        listCheckpoints: async () => [
+          {
+            checkpointId: "checkpoint_later",
+            createdAt: 1777975200000,
+            fileCount: 1,
+            messageId: "msg_agent_2",
+            preview: "write app",
+            scope: "workspace",
+          },
+        ],
+        loadSessionTranscript: async () => [
+          { id: "msg_agent_1", role: "agent", content: "first reply" },
+          {
+            id: "msg_agent_2",
+            role: "agent",
+            content: "updated",
+            parts: [{ type: "tool", toolName: "Write", input: { file_path: "src/app.ts" } }],
+          },
+        ],
+        sessionId: "sess_active",
+        traceId: "trace-active",
+        resume: async () => {
+          throw new Error("resume should not run");
+        },
+        submitPrompt: async () => {
+          throw new Error("prompt should not run");
+        },
+      }) as never,
+    resumeApp: async () => {
+      throw new Error("resume should not run");
+    },
+  });
+
+  const result = await submitPrompt("/fork msg_agent_1 --confirm", {
+    abortSignal: new AbortController().signal,
+  });
+
+  assert.deepEqual(forkTarget, { targetMessageId: "msg_agent_1" });
+  assert.equal(result.response, "Forked session sess_child");
+});
+
+test("command center /fork latest still uses checkpoint fork without confirm", async () => {
+  let forkTarget: { targetCheckpointId?: string; targetMessageId?: string } | undefined;
+  const submitPrompt = createCommandCenter({
+    forkApp: async (options) => {
+      forkTarget = options;
+      return {
+        forkedSessionId: "sess_child",
+        response: "Forked session sess_child",
+      };
+    },
+    getApp: async () =>
+      ({
+        sessionId: "sess_active",
+        traceId: "trace-active",
+        resume: async () => {
+          throw new Error("resume should not run");
+        },
+        submitPrompt: async () => {
+          throw new Error("prompt should not run");
+        },
+      }) as never,
+    resumeApp: async () => {
+      throw new Error("resume should not run");
+    },
+  });
+
+  const result = await submitPrompt("/fork latest", {
+    abortSignal: new AbortController().signal,
+  });
+
+  assert.equal(forkTarget, undefined);
+  assert.equal(result.response, "Forked session sess_child");
+  assert.equal(result.selection, undefined);
+});
+
 
 test("command center starts a new session without sending a model prompt", async () => {
   let promptSubmitted = false;

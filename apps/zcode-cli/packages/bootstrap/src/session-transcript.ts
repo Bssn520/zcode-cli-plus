@@ -32,6 +32,8 @@ export type SessionTranscriptPart =
 
 export interface SessionTranscriptMessage {
   content: string;
+  /** 供 TUI fork picker 锚定；不影响 agent/prompt。 */
+  id?: string;
   parts?: SessionTranscriptPart[];
   role: "agent" | "user";
 }
@@ -74,6 +76,7 @@ export function projectSessionTranscript(
       }
       transcript.push({
         content: text,
+        ...(message.info.id ? { id: String(message.info.id) } : {}),
         role: "user",
       });
       continue;
@@ -93,6 +96,7 @@ export function projectSessionTranscript(
     }
     transcript.push({
       content: text,
+      ...(message.info.id ? { id: String(message.info.id) } : {}),
       ...(visibleParts.length > 0 ? { parts: visibleParts } : {}),
       role: "agent",
     });

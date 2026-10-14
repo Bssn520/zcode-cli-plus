@@ -69,6 +69,7 @@ export function AppView(props: {
   lastEvent: string;
   loginRequired: boolean;
   liveModelText: string;
+  messageActionsFocus?: import("./app-message-actions-keyboard.js").MessageActionsFocusState;
   mode: string;
   modeOptions: readonly TuiModeOption[];
   modeSelection?: ModeCommandSelectionState;
@@ -78,6 +79,7 @@ export function AppView(props: {
   modelSelection?: ModelCommandSelectionState;
   messages: Message[];
   networkRequests: NetworkRequest[];
+  onForkMessage?: (messageId: string) => void;
   options: TuiOptions;
   queuedInputs?: QueuedInput[];
   selection?: SelectionState;
@@ -182,9 +184,13 @@ export function AppView(props: {
       h(ContentPane, {
         id: "main-transcript",
         animateEmptyLogo: !props.options.noColor,
+        busy: props.busy,
         copy: props.copy,
         focused: false,
+        messageActionsFocus: props.messageActionsFocus,
         messages: transcriptMessages,
+        onForkMessage: props.onForkMessage,
+        showMessageActions: true,
         terminalWidth: actionPanelContentWidth,
         workflowCardsByToolCallId: props.workflowCardsByToolCallId,
         expandedWorkflowRunIds: props.expandedWorkflowRunIds,

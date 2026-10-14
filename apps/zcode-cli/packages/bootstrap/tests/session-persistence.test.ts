@@ -1995,7 +1995,8 @@ describe("session persistence", () => {
       expect(turnStarted?.payload).toMatchObject({
         input: "/init include package scripts",
       });
-      await expect(app.loadSessionTranscript()).resolves.toEqual([
+      const transcript = await app.loadSessionTranscript();
+      expect(transcript.map(({ content, role }) => ({ content, role }))).toEqual([
         {
           content: "/init include package scripts",
           role: "user",
@@ -2005,6 +2006,7 @@ describe("session persistence", () => {
           role: "agent",
         },
       ]);
+      expect(transcript.every((message) => typeof message.id === "string")).toBe(true);
     } finally {
       store.close();
       await rm(tempRoot, { recursive: true, force: true });
@@ -2705,7 +2707,8 @@ describe("session persistence", () => {
       });
 
       await resumedApp.resume();
-      await expect(resumedApp.loadSessionTranscript()).resolves.toEqual([
+      const transcript = await resumedApp.loadSessionTranscript();
+      expect(transcript.map(({ content, role }) => ({ content, role }))).toEqual([
         {
           content: "first prompt",
           role: "user",
@@ -2715,6 +2718,7 @@ describe("session persistence", () => {
           role: "agent",
         },
       ]);
+      expect(transcript.every((message) => typeof message.id === "string")).toBe(true);
     } finally {
       store.close();
       await rm(tempRoot, { recursive: true, force: true });

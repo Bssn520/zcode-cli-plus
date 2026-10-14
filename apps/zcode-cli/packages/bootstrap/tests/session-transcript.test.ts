@@ -63,6 +63,32 @@ describe("session transcript projection", () => {
     ]);
   });
 
+  it("projects message ids for UI consumers", () => {
+    const transcript = projectSessionTranscript([
+      {
+        info: { id: "msg_user_1", role: "user" },
+        parts: [{ id: "part-user", text: "hello", type: "text" }],
+      },
+      {
+        info: { id: "msg_agent_1", role: "assistant" },
+        parts: [{ id: "part-assistant", text: "hi there", type: "text" }],
+      },
+    ] as unknown as MessageWithParts[]);
+
+    expect(transcript).toEqual([
+      {
+        content: "hello",
+        id: "msg_user_1",
+        role: "user",
+      },
+      {
+        content: "hi there",
+        id: "msg_agent_1",
+        role: "agent",
+      },
+    ]);
+  });
+
   it("preserves assistant thought and tool parts for resume rendering", () => {
     const transcript = projectSessionTranscript([
       {
@@ -255,5 +281,24 @@ describe("session transcript projection", () => {
       toolName,
       type: "tool",
     });
+  });
+
+
+  it("includes message ids on projected user and agent rows", () => {
+    const transcript = projectSessionTranscript([
+      {
+        info: { id: "msg_user_1", role: "user" },
+        parts: [{ id: "part-user", text: "hello", type: "text" }],
+      },
+      {
+        info: { id: "msg_agent_1", role: "assistant" },
+        parts: [{ id: "part-assistant", text: "hi there", type: "text" }],
+      },
+    ] as unknown as MessageWithParts[]);
+
+    expect(transcript).toEqual([
+      { content: "hello", id: "msg_user_1", role: "user" },
+      { content: "hi there", id: "msg_agent_1", role: "agent" },
+    ]);
   });
 });

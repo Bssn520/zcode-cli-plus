@@ -31,6 +31,11 @@ import type {
   SelectionState,
   SlashSelectionState,
 } from "./app-model.js";
+import {
+  forkCommandForMessage,
+  MESSAGE_ACTIONS_BUSY_STATUS,
+  type MessageActionsFocusState,
+} from "./app-message-actions-keyboard.js";
 import { useTuiThemeSync } from "./app-theme-sync.js";
 import { useSessionEventApplier } from "./app-session-event-handler.js";
 import { useTuiWorkflowRuns } from "./app-workflow-controller.js";
@@ -93,6 +98,9 @@ export function TuiApp({
   const [selection, setSelection] = useState<SelectionState | undefined>(() =>
     createSelectionState(initialResult?.selection),
   );
+  const [messageActionsFocus, setMessageActionsFocus] = useState<
+    MessageActionsFocusState | undefined
+  >();
   const [slashSelection, setSlashSelection] = useState<SlashSelectionState | undefined>();
   const [approvalQueue, setApprovalQueue] = useState<ApprovalPrompt[]>([]);
   const [inputCursorToEndVersion, setInputCursorToEndVersion] = useState(0);
@@ -346,6 +354,7 @@ export function TuiApp({
     recallPreviousInput,
     draftValue: draft,
     inputHistoryActive: inputHistoryDraftRef.current !== undefined,
+    messageActionsFocus,
     messages,
     modelSelection: modelCommand.selection,
     modeSelection: modeCommand.selection,
@@ -354,6 +363,7 @@ export function TuiApp({
     setDraftAttachments,
     setDraftValue,
     setEffortSelection: effortCommand.setSelection,
+    setMessageActionsFocus,
     setModelSelection: modelCommand.setSelection,
     setModeSelection: modeCommand.setSelection,
     setSelection,
@@ -386,9 +396,18 @@ export function TuiApp({
     liveModelText,
     mode,
     model,
+    messageActionsFocus,
     messages,
     modifiedFiles,
     networkRequests,
+    onForkMessage: (messageId: string) => {
+      if (busy) {
+        setStatus(MESSAGE_ACTIONS_BUSY_STATUS);
+        return;
+      }
+      setMessageActionsFocus(undefined);
+      void submitValue(forkCommandForMessage(messageId));
+    },
     options,
     queuedInputs,
     selection,
