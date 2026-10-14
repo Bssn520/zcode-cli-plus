@@ -3,10 +3,13 @@ import {
   ASK_USER_QUESTION_TOOL_NAME,
   AskUserQuestionInputSchema,
   CREATE_WORKFLOW_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  ExitPlanModeInputSchema,
   type PermissionBrokerResult,
 } from "@zcode/contracts";
 import type React from "react";
 import type { ApprovalPrompt } from "./app-model.js";
+import { createPlanApprovalState } from "./app-plan-approval-state.js";
 import { createQuestionPromptState } from "./app-question-state.js";
 import type { TuiRequestPermission } from "./types.js";
 
@@ -67,6 +70,22 @@ export function createTuiPermissionRequester(input: {
         return;
       }
 
+      const parsedPlan =
+        request.toolName === EXIT_PLAN_MODE_TOOL_NAME
+          ? ExitPlanModeInputSchema.safeParse(request.input)
+          : undefined;
+
+      if (parsedPlan && !parsedPlan.success) {
+        resolve({
+          decision: "deny",
+          reason: `Invalid ExitPlanMode input: ${
+            parsedPlan.error.issues[0]?.message ?? "schema validation failed"
+          }`,
+          resolvedAt: new Date(),
+        });
+        return;
+      }
+
       const cleanup = () => {
         requestOptions?.signal?.removeEventListener("abort", abortHandler);
       };
@@ -92,6 +111,9 @@ export function createTuiPermissionRequester(input: {
 
       approval = {
         cleanup,
+        planApprovalState: parsedPlan?.success
+          ? createPlanApprovalState(parsedPlan.data.plan)
+          : undefined,
         questionState: parsedQuestion?.success
           ? createQuestionPromptState(parsedQuestion.data)
           : undefined,
@@ -104,9 +126,11 @@ export function createTuiPermissionRequester(input: {
       requestOptions?.signal?.addEventListener("abort", abortHandler, { once: true });
       input.setApprovalQueue((current) => [...current, approval]);
       input.setStatus(
-        approval.questionState
-          ? "Answer the clarification question."
-          : `Approval required for ${request.toolName}.`,
+        approval.planApprovalState
+          ? "Review the implementation plan."
+          : approval.questionState
+            ? "Answer the clarification question."
+            : `Approval required for ${request.toolName}.`,
       );
     });
 }

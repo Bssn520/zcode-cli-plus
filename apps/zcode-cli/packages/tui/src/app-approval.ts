@@ -1,4 +1,8 @@
-import type { PermissionBrokerRequest, PermissionBrokerResult } from "@zcode/contracts";
+import type {
+  PermissionBrokerRequest,
+  PermissionBrokerResult,
+  SupportedLocale,
+} from "@zcode/contracts";
 import { OFFICIAL_CUA_PERMISSION_RULE_TOOL_NAME } from "@zcode/shared";
 import type { KeyEvent } from "@mbears/opentui-core";
 import type React from "react";
@@ -6,6 +10,8 @@ import type { ApprovalDecision, ApprovalPrompt } from "./app-model.js";
 import { approvalDecisions } from "./app-model.js";
 import { clampIndex } from "./app-input.js";
 import { handleQuestionKey } from "./app-question-state.js";
+import { handlePlanApprovalKey } from "./app-plan-approval-state.js";
+import type { SuspendTerminal } from "./app-plan-editor.js";
 import { asRecord, stringField } from "./state.js";
 
 const COMMAND_INPUT_FIELD = "command";
@@ -20,7 +26,16 @@ export function handleApprovalKey(
   approval: ApprovalPrompt,
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
   setStatus: (status: string) => void,
+  options?: {
+    locale?: SupportedLocale;
+    suspendTerminal?: SuspendTerminal;
+  },
 ): void {
+  if (approval.planApprovalState) {
+    handlePlanApprovalKey(key, approval, setApprovalQueue, setStatus, options);
+    return;
+  }
+
   if (approval.questionState) {
     handleQuestionKey(key, approval, setApprovalQueue, setStatus);
     return;

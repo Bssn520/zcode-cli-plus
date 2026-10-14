@@ -131,8 +131,33 @@ export type QuestionPromptState = {
   selectedOptionIndex: number;
 };
 
+export type PlanApprovalComment = {
+  id: string;
+  kind: "overall" | "step";
+  stepIndex?: number;
+  stepLabel?: string;
+  text: string;
+};
+
+export type PlanApprovalCommentTarget = { kind: "overall" } | { kind: "step"; stepIndex: number };
+
+export type PlanApprovalMode = "browse" | "comment" | "review";
+
+export type PlanApprovalState = {
+  commentBuffer: string;
+  comments: PlanApprovalComment[];
+  commentTarget: PlanApprovalCommentTarget | null;
+  draftPlan: string;
+  mode: PlanApprovalMode;
+  originalPlan: string;
+  selectedCommentIndex: number;
+  selectedStepIndex: number;
+  statusMessage?: string;
+};
+
 export type ApprovalPrompt = {
   cleanup: () => void;
+  planApprovalState?: PlanApprovalState;
   questionState?: QuestionPromptState;
   reject: (error: Error) => void;
   request: PermissionBrokerRequest;

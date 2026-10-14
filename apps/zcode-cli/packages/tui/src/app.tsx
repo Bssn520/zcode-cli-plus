@@ -371,10 +371,12 @@ export function TuiApp({
     setStatus,
     slashSelection,
     submitValue,
+    suspendTerminal: options.suspendTerminal,
     switchMode,
     workflowExpansion: workflowRuns.expansion,
     toggleSidebar: sidebar.toggleSidebar,
     toggleSidebarSection: sidebar.toggleSidebarSection,
+    locale,
   });
 
   return React.createElement(AppView, {

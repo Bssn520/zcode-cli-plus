@@ -106,6 +106,10 @@ export async function runTuiWithRenderer(
               themeModeListeners.delete(listener);
             };
           },
+          suspendTerminal: {
+            resume: () => renderer.resume(),
+            suspend: () => renderer.suspend(),
+          },
         },
         copySelection,
         hasCopyableSelection: () =>

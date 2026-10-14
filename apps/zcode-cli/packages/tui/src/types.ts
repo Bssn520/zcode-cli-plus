@@ -338,6 +338,11 @@ export type TuiOptions = {
   subscribeThemeMode?: (listener: (mode: UiThemeMode) => void) => () => void;
   setTerminalBackgroundColor?: (color: string) => void;
   writeClipboardText?: TuiWriteClipboardText;
+  /** Pause/resume OpenTUI while an external editor owns the terminal. */
+  suspendTerminal?: {
+    resume(): void;
+    suspend(): void;
+  };
 };
 
 export type TuiStartupOptions = Pick<
