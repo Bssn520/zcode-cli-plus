@@ -11,6 +11,7 @@ import {
 } from "./app-approval.js";
 import { truncateDisplay, wordWrappedLineCount } from "./app-terminal-width.js";
 import { QuestionPanel } from "./app-question-panel.js";
+import { PlanApprovalPanel } from "./app-plan-approval-panel.js";
 
 const h = React.createElement as (
   type: React.ElementType | string,
@@ -37,6 +38,13 @@ export function ApprovalPanel({
   approval: ApprovalPrompt;
   contentWidth?: number;
 }): React.ReactElement {
+  if (approval.planApprovalState) {
+    return h(PlanApprovalPanel, {
+      contentWidth,
+      state: approval.planApprovalState,
+    });
+  }
+
   if (approval.questionState) {
     return h(QuestionPanel, { state: approval.questionState });
   }

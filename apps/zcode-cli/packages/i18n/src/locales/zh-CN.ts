@@ -59,7 +59,7 @@ Slash Commands:
   /compact [instructions]  压缩当前对话
   /expert [status|resume|stop|<task>]  运行或管理 expert workflow
   /dwf [list|cancel|resume]  列出、取消或恢复 dynamic workflow run
-  /fork [latest|checkpointId]  从 workspace checkpoint 派生新 session
+  /fork [latest|checkpointId|msg|msg_<id>]  从 checkpoint 或助手回复派生新 session
   /mcp [list|status|connect|disconnect]  查看或管理 MCP servers
   /mode [mode]          查看或切换权限模式：build、edit、plan、yolo 或 guarded
   /model [id]           查看或切换当前 session 模型
@@ -308,6 +308,10 @@ Slash Commands:
         complete: "思考",
         thinking: "思考中...",
       },
+      messageActions: {
+        busyHint: "请等待当前回复完成",
+        fork: "Fork",
+      },
       title: "对话",
       workflow: {
         actors: "actors：",
@@ -356,6 +360,26 @@ Slash Commands:
     slash: {
       title: "命令",
       row: ({ name, selected, summary }) => `${selected ? ">" : " "} /${name}  ${summary}`,
+    },
+    planApproval: {
+      title: "计划确认",
+      prompt: "退出计划模式并开始实现？",
+      stepsHeading: "步骤",
+      filesHeading: "文件",
+      risksHeading: "风险",
+      previewHeading: "预览",
+      editedBadge: "已编辑",
+      noteMarker: "备注",
+      stepCount: (count) => `${count} 个步骤`,
+      commentCount: (count) => `${count} 条意见`,
+      help: "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
+      commentStepTitle: (index) => `步骤 ${index} 的意见`,
+      commentOverallTitle: "整体计划意见",
+      commentHelp: "Enter 挂上 · Esc 返回",
+      reviewTitle: "审阅意见",
+      reviewHelp: "Enter 发送意见 · d 删除 · Esc 返回 · j/k 选择",
+      stepCommentSummary: ({ index, label, text }) => `[步骤 ${index}] ${label}：${text}`,
+      overallCommentSummary: (text) => `[整体] ${text}`,
     },
   },
 };

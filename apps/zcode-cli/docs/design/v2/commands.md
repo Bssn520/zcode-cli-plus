@@ -18,7 +18,7 @@ TUI 的 slash command 候选列表见 [`tui-slash-command-suggestions.md`](./tui
 - `/compact [instructions]`: 走现有 core manual compact 路径，允许附加总结指令。
 - `/expert [status|resume|stop|<task>]`: 启动或管理 expert workflow；带任务时默认把当前 session 切到 `yolo`，并通过 workflow runtime 调度多个 agent activity。
 - `/effort [list|<level>]`: 查询或切换当前 session 的 reasoning/thinking 深度；可选 level 来自当前模型 catalog/config 的 reasoning metadata。交互式 TUI 在 composer 内用类似 `/model` 的候选 popup 选择，提交显式 `/effort <level>`。`/variant` 是输入兼容别名。
-- `/fork [latest|checkpointId]`: 从 workspace checkpoint 分叉新 session；无参数或 `latest` 使用最新 checkpoint，有参数时按 checkpoint id 分叉。
+- `/fork [latest|checkpointId|msg|msg_<id>]`: 从 workspace checkpoint 或助手回复分叉新 session。无参数或 `latest` / checkpoint id 走原 checkpoint 路径；`/fork msg` 打开助手回复 picker；`/fork msg_<id>` 先弹出回滚警告确认（默认取消），确认后才 `forkFromCheckpoint({ targetMessageId })`。详见 [`tui-fork-from-assistant.md`](./tui-fork-from-assistant.md) 与 [`tui-message-action-bar.md`](./tui-message-action-bar.md)。
 - `/help [command]`: 本地只读展示 slash command 帮助；不创建 session、不发模型请求、不访问外部 I/O。有参数时只展示目标命令的用法，参数可带或不带开头的 `/`。
 - `/login`: 使用 ZCode/Z.AI CLI OAuth device flow 登录；命令层调用 bootstrap 登录服务，不创建普通模型 session。Init 返回授权 URL 后必须立刻通过 assistant transcript message 展示链接，避免 SSH/远程终端场景只在宿主机打开浏览器而用户看不到可复制链接。
 - `/locale [auto|en-US|zh-CN]`: 查询或切换当前 UI 语言，并把请求值持久化到配置文件；`/language` 是输入兼容别名。

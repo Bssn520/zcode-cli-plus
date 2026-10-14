@@ -243,9 +243,9 @@ export function createTuiSubmitPrompt(
   };
 
   const commandCenter = createCommandCenter({
-    forkApp: async (targetCheckpointId) => {
+    forkApp: async (options) => {
       const activeApp = await getApp();
-      const result = await activeApp.forkFromCheckpoint?.({ targetCheckpointId });
+      const result = await activeApp.forkFromCheckpoint?.(options);
       if (!result) {
         throw new Error("Forking is not available in this client.");
       }

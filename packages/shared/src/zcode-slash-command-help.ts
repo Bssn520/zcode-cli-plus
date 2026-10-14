@@ -83,10 +83,12 @@ export const BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES: readonly BuiltinZCodeSlas
     details: [
       "In the TUI, opens a checkpoint picker when called without arguments.",
       "Use latest or a specific checkpoint id to bypass the picker.",
+      "Use /fork msg to pick an assistant reply, or /fork msg_<id> to fork from that reply.",
+      "Message forks always show a confirm warning that workspace files changed after the reply may roll back; Cancel is selected by default, confirm with --confirm.",
     ],
     name: "fork",
-    summary: "Fork a new session from a workspace checkpoint.",
-    usage: "/fork [latest|checkpointId]",
+    summary: "Fork a new session from a workspace checkpoint or assistant reply.",
+    usage: "/fork [latest|checkpointId|msg|msg_<id>]",
   },
   {
     aliases: ["language"],

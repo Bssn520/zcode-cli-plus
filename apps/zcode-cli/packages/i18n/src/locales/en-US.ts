@@ -59,7 +59,7 @@ Slash Commands:
   /compact [instructions]  Compact the current conversation
   /expert [status|resume|stop|<task>]  Run or manage the expert workflow
   /dwf [list|cancel|resume]  List, cancel, or resume dynamic workflow runs
-  /fork [latest|checkpointId]  Fork a new session from a workspace checkpoint
+  /fork [latest|checkpointId|msg|msg_<id>]  Fork from a checkpoint or assistant reply
   /mcp [list|status|connect|disconnect]  Show or manage MCP servers
   /mode [mode]          Show or switch permission mode: build, edit, plan, yolo, or guarded
   /model [id]           Show or switch the current session model
@@ -311,6 +311,10 @@ Slash Commands:
         complete: "Thought",
         thinking: "Thinking...",
       },
+      messageActions: {
+        busyHint: "wait until current reply finishes",
+        fork: "Fork",
+      },
       title: "Transcript",
       workflow: {
         actors: "actors:",
@@ -359,6 +363,26 @@ Slash Commands:
     slash: {
       title: "Commands",
       row: ({ name, selected, summary }) => `${selected ? ">" : " "} /${name}  ${summary}`,
+    },
+    planApproval: {
+      title: "Plan approval",
+      prompt: "Exit plan mode and start implementation?",
+      stepsHeading: "Steps",
+      filesHeading: "Files",
+      risksHeading: "Risks",
+      previewHeading: "Preview",
+      editedBadge: "edited",
+      noteMarker: "note",
+      stepCount: (count) => `${count} steps`,
+      commentCount: (count) => `${count} comments`,
+      help: "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select",
+      commentStepTitle: (index) => `Feedback on step ${index}`,
+      commentOverallTitle: "Overall plan feedback",
+      commentHelp: "Enter attaches · Esc back",
+      reviewTitle: "Review comments",
+      reviewHelp: "Enter send feedback · d delete · Esc back · j/k select",
+      stepCommentSummary: ({ index, label, text }) => `[step ${index}] ${label}: ${text}`,
+      overallCommentSummary: (text) => `[general] ${text}`,
     },
   },
 };

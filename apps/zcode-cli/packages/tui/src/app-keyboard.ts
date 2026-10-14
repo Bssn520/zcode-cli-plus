@@ -36,6 +36,11 @@ import type {
   SlashCommand,
   SlashSelectionState,
 } from "./app-model.js";
+import {
+  MESSAGE_ACTIONS_ENTER_STATUS,
+  resolveMessageActionsKey,
+  type MessageActionsFocusState,
+} from "./app-message-actions-keyboard.js";
 import type { SidebarSectionId } from "./app-sidebar-layout.js";
 import type { TuiEffortOption, TuiModeOption, TuiModelOption } from "./types.js";
 import { latestRetryableCompactCommand } from "./app-compact-timeline.js";
@@ -67,6 +72,7 @@ type UseTuiKeyboardControlsOptions = {
   filteredSlashCommands: readonly SlashCommand[];
   handleFileMentionKey: (key: KeyEvent) => boolean;
   inputHistoryActive: boolean;
+  messageActionsFocus: MessageActionsFocusState | undefined;
   messages: readonly Message[];
   effortSelection: EffortCommandSelectionState | undefined;
   modelSelection: ModelCommandSelectionState | undefined;
@@ -80,6 +86,7 @@ type UseTuiKeyboardControlsOptions = {
   setDraftAttachments: Dispatch<SetStateAction<DraftAttachment[]>>;
   setDraftValue: (value: string) => void;
   setEffortSelection: Dispatch<SetStateAction<EffortCommandSelectionState | undefined>>;
+  setMessageActionsFocus: Dispatch<SetStateAction<MessageActionsFocusState | undefined>>;
   setModelSelection: Dispatch<SetStateAction<ModelCommandSelectionState | undefined>>;
   setModeSelection: Dispatch<SetStateAction<ModeCommandSelectionState | undefined>>;
   setSelection: Dispatch<SetStateAction<SelectionState | undefined>>;
@@ -87,9 +94,11 @@ type UseTuiKeyboardControlsOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
   slashSelection: SlashSelectionState | undefined;
   submitValue: (value: string, options?: SubmitValueOptions) => Promise<void>;
+  suspendTerminal?: import("./app-plan-editor.js").SuspendTerminal;
   switchMode: () => void;
   toggleSidebar: () => boolean;
   toggleSidebarSection: (section: SidebarSectionId) => boolean;
+  locale?: import("@zcode/contracts").SupportedLocale;
 };
 
 export function useTuiKeyboardControls({
@@ -106,6 +115,7 @@ export function useTuiKeyboardControls({
   filteredSlashCommands,
   handleFileMentionKey,
   inputHistoryActive,
+  messageActionsFocus,
   messages,
   effortSelection,
   modelSelection,
@@ -119,6 +129,7 @@ export function useTuiKeyboardControls({
   setDraftAttachments,
   setDraftValue,
   setEffortSelection,
+  setMessageActionsFocus,
   setModelSelection,
   setModeSelection,
   setSelection,
@@ -126,9 +137,11 @@ export function useTuiKeyboardControls({
   setStatus,
   slashSelection,
   submitValue,
+  suspendTerminal,
   switchMode,
   toggleSidebar,
   toggleSidebarSection,
+  locale,
 }: UseTuiKeyboardControlsOptions): void {
   const ctrlCExitGuardRef = useRef<CtrlCExitGuard>(createCtrlCExitGuard());
   const sidebarShortcutRef = useRef<SidebarShortcutState>(createSidebarShortcutState());
@@ -170,7 +183,10 @@ export function useTuiKeyboardControls({
         if (approval) {
           resetCtrlCExitGuard(ctrlCExitGuardRef.current);
           consumeKey(key);
-          handleApprovalKey(key, approval, setApprovalQueue, setStatus);
+          handleApprovalKey(key, approval, setApprovalQueue, setStatus, {
+            locale,
+            suspendTerminal,
+          });
           return;
         }
 
@@ -183,6 +199,40 @@ export function useTuiKeyboardControls({
           return;
         }
 
+        const messageActionsResult = resolveMessageActionsKey({
+          busy,
+          key,
+          messages,
+          state: messageActionsFocus,
+        });
+        if (messageActionsResult.type !== "ignore") {
+          // Block entering action-bar mode while suggestion popups are open.
+          if (
+            !messageActionsFocus &&
+            (slashSelection || modelSelection || modeSelection || effortSelection)
+          ) {
+            // fall through
+          } else {
+            resetCtrlCExitGuard(ctrlCExitGuardRef.current);
+            consumeKey(key);
+            if (messageActionsResult.type === "set") {
+              setMessageActionsFocus(messageActionsResult.state);
+              if (messageActionsResult.state) {
+                setStatus(MESSAGE_ACTIONS_ENTER_STATUS);
+              }
+              return;
+            }
+            if (messageActionsResult.type === "status" || messageActionsResult.type === "blocked") {
+              setStatus(messageActionsResult.status);
+              return;
+            }
+            if (messageActionsResult.type === "activate") {
+              setMessageActionsFocus(undefined);
+              void submitValue(messageActionsResult.command);
+              return;
+            }
+          }
+        }
         if (
           handleSidebarShortcutKey({
             consumeKey,
@@ -390,6 +440,7 @@ export function useTuiKeyboardControls({
         filteredSlashCommands,
         handleFileMentionKey,
         inputHistoryActive,
+        messageActionsFocus,
         messages,
         modelSelection,
         modeSelection,
@@ -402,6 +453,7 @@ export function useTuiKeyboardControls({
         setDraftAttachments,
         setDraftValue,
         setEffortSelection,
+        setMessageActionsFocus,
         setModelSelection,
         setModeSelection,
         setSelection,
@@ -409,9 +461,11 @@ export function useTuiKeyboardControls({
         setStatus,
         slashSelection,
         submitValue,
+        suspendTerminal,
         switchMode,
         toggleSidebar,
         toggleSidebarSection,
+        locale,
       ],
     ),
   );

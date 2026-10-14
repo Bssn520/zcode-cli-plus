@@ -17,6 +17,11 @@ import { handleSkillListCommand } from "./handlers/skill.js";
 import { handleTargetCommand } from "./handlers/goal.js";
 import { recordSlashCommandInHistory } from "./history.js";
 import { attachCurrentSessionMetadata, normalizeTuiPromptInput } from "./metadata.js";
+import {
+  buildAssistantMessageSelection,
+  buildForkConfirmSelection,
+  parseForkTarget,
+} from "./fork-message.js";
 import { buildCheckpointSelection, buildSessionSelection } from "./selections.js";
 import {
   buildManualSkillPrompt,
@@ -264,9 +269,57 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
             };
           }
         }
-        const targetCheckpointId = parseForkTarget(command.args);
+
+        const forkTarget = parseForkTarget(command.args);
+        if (forkTarget.kind === "message-picker") {
+          const app = await deps.getApp();
+          const messages = app.loadSessionTranscript ? await app.loadSessionTranscript() : [];
+          return {
+            mode: deps.getMode?.(),
+            response: "Select an assistant reply to fork.",
+            selection: buildAssistantMessageSelection(messages),
+          };
+        }
+
+        if (forkTarget.kind === "message") {
+          if (forkTarget.cancelled) {
+            return {
+              mode: deps.getMode?.(),
+              response: "Fork cancelled.",
+            };
+          }
+
+          if (!forkTarget.confirmed) {
+            return {
+              mode: deps.getMode?.(),
+              response:
+                "Forking may roll back workspace files changed after this reply. The original session stays intact. Default selection is Cancel.",
+              selection: buildForkConfirmSelection(forkTarget.messageId),
+            };
+          }
+
+          if (deps.forkApp) {
+            const result = await deps.forkApp({ targetMessageId: forkTarget.messageId });
+            return {
+              mode: deps.getMode?.(),
+              response: result.response,
+              traceId: undefined,
+            };
+          }
+
+          const app = await deps.getApp();
+          return attachCurrentSessionMetadata(
+            await app.submitPrompt(`/fork ${forkTarget.messageId} --confirm`, options),
+            deps,
+            app,
+          );
+        }
+
+        const targetCheckpointId = forkTarget.checkpointId;
         if (deps.forkApp) {
-          const result = await deps.forkApp(targetCheckpointId);
+          const result = await deps.forkApp(
+            targetCheckpointId ? { targetCheckpointId } : undefined,
+          );
           return {
             mode: deps.getMode?.(),
             response: result.response,
@@ -386,11 +439,6 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
   };
 }
 
-function parseForkTarget(args: string): string | undefined {
-  const trimmed = args.trim();
-  if (trimmed.length === 0 || trimmed === "latest") return undefined;
-  return trimmed;
-}
 
 async function isLoginRequired(deps: CommandCenterDeps): Promise<boolean> {
   if (!deps.hasSelectableModels) return false;

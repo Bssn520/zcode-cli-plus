@@ -77,6 +77,8 @@ The reusable selection list covers:
 - `/resume` in the TUI: choose a persisted root session.
 - `/rewind` in the TUI: choose a workspace checkpoint to restore in the current session.
 - `/fork` in the TUI: choose a workspace checkpoint to fork from.
+- `/fork msg` / `/fork message`: assistant reply picker; rows submit `/fork msg_<id>`.
+- `/fork msg_<id>`: generic workspace-rollback warning confirm (Cancel default). Confirm runs `/fork msg_<id> --confirm`.
 
 Explicit commands remain scriptable and bypass the picker:
 
