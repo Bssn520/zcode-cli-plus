@@ -59,7 +59,7 @@ Slash Commands:
   /compact [instructions]  Compact the current conversation
   /expert [status|resume|stop|<task>]  Run or manage the expert workflow
   /dwf [list|cancel|resume]  List, cancel, or resume dynamic workflow runs
-  /fork [latest|checkpointId]  Fork a new session from a workspace checkpoint
+  /fork [latest|checkpointId|msg|msg_<id>]  Fork from a checkpoint or assistant reply
   /mcp [list|status|connect|disconnect]  Show or manage MCP servers
   /mode [mode]          Show or switch permission mode: build, edit, plan, yolo, or guarded
   /model [id]           Show or switch the current session model
@@ -310,6 +310,10 @@ Slash Commands:
       thought: {
         complete: "Thought",
         thinking: "Thinking...",
+      },
+      messageActions: {
+        busyHint: "wait until current reply finishes",
+        fork: "Fork",
       },
       title: "Transcript",
       workflow: {

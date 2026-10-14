@@ -249,6 +249,10 @@ export interface TuiCopy {
       complete: string;
       thinking: string;
     };
+    messageActions: {
+      busyHint: string;
+      fork: string;
+    };
     title: string;
     workflow: {
       actors: string;

@@ -59,7 +59,7 @@ Slash Commands:
   /compact [instructions]  压缩当前对话
   /expert [status|resume|stop|<task>]  运行或管理 expert workflow
   /dwf [list|cancel|resume]  列出、取消或恢复 dynamic workflow run
-  /fork [latest|checkpointId]  从 workspace checkpoint 派生新 session
+  /fork [latest|checkpointId|msg|msg_<id>]  从 checkpoint 或助手回复派生新 session
   /mcp [list|status|connect|disconnect]  查看或管理 MCP servers
   /mode [mode]          查看或切换权限模式：build、edit、plan、yolo 或 guarded
   /model [id]           查看或切换当前 session 模型
@@ -307,6 +307,10 @@ Slash Commands:
       thought: {
         complete: "思考",
         thinking: "思考中...",
+      },
+      messageActions: {
+        busyHint: "请等待当前回复完成",
+        fork: "Fork",
       },
       title: "对话",
       workflow: {

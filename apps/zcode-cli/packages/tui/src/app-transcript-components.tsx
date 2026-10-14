@@ -5,11 +5,15 @@ import { palette } from "./app-model.js";
 import { EmptyTranscriptLogo } from "./app-empty-transcript.js";
 import { DEFAULT_TUI_COPY } from "./app-locale.js";
 import { MarkdownText } from "./app-markdown.js";
+import {
+  MessageActionBar,
+  shouldRenderMessageActionBar,
+} from "./app-message-actions.js";
+import type { MessageActionsFocusState } from "./app-message-actions-keyboard.js";
 import { ThoughtTranscriptPartView } from "./app-thought-components.js";
 import { ToolTranscriptPartView } from "./app-tool-components.js";
 import { WorkflowRunCardView } from "./app-workflow-card.js";
 import type { TuiWorkflowCard } from "./app-workflow-mirror.js";
-
 const h = React.createElement as (
   type: React.ElementType | string,
   props?: Record<string, unknown> | null,
@@ -20,22 +24,30 @@ const USER_MESSAGE_VERTICAL_PADDING = 1;
 
 export function ContentPane({
   animateEmptyLogo = false,
+  busy = false,
   copy = DEFAULT_TUI_COPY,
   expandedWorkflowRunIds,
   emptyText,
   id,
   focused,
+  messageActionsFocus,
   messages,
+  onForkMessage,
+  showMessageActions = false,
   terminalWidth = 100,
   workflowCardsByToolCallId,
 }: {
   animateEmptyLogo?: boolean;
+  busy?: boolean;
   copy?: TuiCopy;
   expandedWorkflowRunIds?: ReadonlySet<string>;
   emptyText?: string;
   id?: string;
   focused: boolean;
+  messageActionsFocus?: MessageActionsFocusState;
   messages: Message[];
+  onForkMessage?: (messageId: string) => void;
+  showMessageActions?: boolean;
   terminalWidth?: number;
   workflowCardsByToolCallId?: ReadonlyMap<string, TuiWorkflowCard>;
 }): React.ReactElement {
@@ -80,11 +92,16 @@ export function ContentPane({
         ]
       : messages.map((message, index) =>
           h(MessageRow, {
+            busy,
             copy,
             expandedWorkflowRunIds,
             index,
             key: `${index}-${message.role}`,
             message,
+            messageActionsFocus:
+              messageActionsFocus?.messageIndex === index ? messageActionsFocus : undefined,
+            onForkMessage,
+            showMessageActions,
             terminalWidth,
             workflowCardsByToolCallId,
           }),
@@ -93,16 +110,24 @@ export function ContentPane({
 }
 
 export function MessageRow({
+  busy = false,
   copy = DEFAULT_TUI_COPY,
   expandedWorkflowRunIds,
   message,
+  messageActionsFocus,
+  onForkMessage,
+  showMessageActions = false,
   terminalWidth = 100,
   workflowCardsByToolCallId,
 }: {
+  busy?: boolean;
   copy?: TuiCopy;
   expandedWorkflowRunIds?: ReadonlySet<string>;
   index: number;
   message: Message;
+  messageActionsFocus?: MessageActionsFocusState;
+  onForkMessage?: (messageId: string) => void;
+  showMessageActions?: boolean;
   terminalWidth?: number;
   workflowCardsByToolCallId?: ReadonlyMap<string, TuiWorkflowCard>;
 }): React.ReactElement {
@@ -143,7 +168,7 @@ export function MessageRow({
       : parts.length === 0
         ? [h("text", { key: "content", style: { fg: plainTextColor } }, message.content)]
         : []),
-    ...parts.map((part, partIndex) => {
+...parts.map((part, partIndex) => {
       if (part.type === "tool") {
         // 卡片 join 按 toolCallId（与 GUI buildWorkflowRunByToolCallId 同规）。命中即渲染实时卡：
         // 工具行自己的 status 在 CreateWorkflow 上会在 run 还在飞的时候就变成 completed
@@ -181,6 +206,18 @@ export function MessageRow({
           })
         : h("text", { key: `text-${partIndex}`, style: { fg: plainTextColor } }, part.text);
     }),
+    ...(showMessageActions && shouldRenderMessageActionBar(message) && message.id
+      ? [
+          h(MessageActionBar, {
+            busy,
+            copy,
+            focus: messageActionsFocus,
+            key: "message-actions",
+            messageId: message.id,
+            onFork: onForkMessage,
+          }),
+        ]
+      : []),
   );
 }
 
