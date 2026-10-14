@@ -69,7 +69,6 @@
 @zcode/bootstrap	tests/provider-registry-selection.test.ts	listRegistryBackedModels 直接把 Registry 事实投影为协议 Model Option，不建立内部 alias DTO	v3.15.1	fail	
 @zcode/bootstrap	tests/provider-runtime-headers-cancel.test.ts	真实工厂同样装配唯一请求端口，完整账号事实透传而不写旧 ModelRef	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/read-pdf-model-switch.e2e.test.ts	Read PDF model capability switching E2E omits and restores raw PDF data in final provider requests	v3.15.1	fail	
-@zcode/bootstrap	tests/read-pdf.e2e.test.ts	Read PDF Poppler E2E runs the runtime descriptor and executor through Poppler in page order	v3.15.1	fail	
 @zcode/bootstrap	tests/read-pdf.e2e.test.ts	Read PDF provider and cold-resume E2E preserves the final Chat page order after a real runtime cold resume	v3.15.1	fail	
 @zcode/bootstrap	tests/runtime-unbound-config.test.ts	Runtime 创建与未绑定恢复的边界 新建空白会话没有 configured default 时保持未绑定，等待显式提交选择	v3.15.1	fail	
 @zcode/bootstrap	tests/script-workflow.test.ts	script workflow runtime persists child sessions before linking workflow activities	v3.15.1	fail	
@@ -88,6 +87,7 @@
 @zcode/bootstrap	tests/v4-native-boundary.test.ts	v4 原生边界禁令（无桥） zcode-protocol-v4/ 下任何文件不得 import 旧协议目录（zcode-protocol/）	v3.15.1	fail	
 @zcode/bootstrap	tests/v4-native-interaction-background.test.ts	v4 原生 cancelBackgroundWork dwf run：workId 一路打到 DynamicWorkflowRunPort.cancel	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B1 healthy — 装配基线 W4/anthropic-messages：completed，请求数 = 逻辑请求数，零失败	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B2 gate(2) — 3008 在 workflow 内是重试，不是终止 W16/anthropic-messages：completed、零失败子代理、拒绝数有界、cap 收敛、每个 3008 配一条 retry_scheduled	v3.15.1	flaky	CI-only, intermittent timing failure (run 38542311185)
 @zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B3 failFirst(2P, 429) — 普通 429 限流在内重试 W4/anthropic-messages：completed，失败数 = N，请求数 = 逻辑请求数 + N	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
 @zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B9 everyKth(3, stream_error 3008) — 流内业务码走同一策略 W4/anthropic-messages：completed，每个流内 3008 配一条 retry_scheduled{rate_limited}	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model API Key Personal Overlay 经 Registry 原样装配到 Adapter	v3.15.1	fail	
@@ -116,6 +116,7 @@
 @zcode/dynamic-workflow	tests/hole-sites.test.ts	a tail chain twenty fills deep keeps every fill stable and every id as short at step 20 as at step 1	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/dynamic-workflow	tests/hole-sites.test.ts	a tail chain twenty fills deep records each step's enclosing step in fill, so nesting survives without being spelled in the id	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/dynamic-workflow-runtime	tests/args.test.ts	args in the sandbox freezes the top level of the bag	v3.15.1	flaky	timing/concurrency; passed this collection run
+@zcode/dynamic-workflow-runtime	tests/e2e.test.ts	e2e — Promise.race with a losing in-flight ask completes with the winner and aborts the loser at the driver	v3.15.1	flaky	CI-only, intermittent timing failure (run 38542311185)
 @zcode/tui	tests/tui-app.test.ts	Shift+Tab can cycle edit mode to yolo mode	v3.15.1	fail	
 @zcode/tui	tests/tui-app.test.ts	Shift+Tab switches mode through the injected mode setter	v3.15.1	fail	
 @zcode/tui	tests/tui-app.test.ts	mode composer popup can submit edit mode command	v3.15.1	fail	

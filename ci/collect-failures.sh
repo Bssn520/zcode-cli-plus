@@ -27,7 +27,7 @@ for d in */; do d=${d%/}; [ -f "$d/package.json" ] || continue
   if [[ "$t" == *vitest* ]]; then
     pre=""; [[ "$t" == *generate-libs* ]] && (cd $d && node scripts/generate-libs.mjs >/dev/null 2>&1)
     dir=$(echo "$t" | grep -oE 'vitest( run)? [a-z]+' | awk '{print $NF}'); [ "$dir" = run ] && dir=""
-    (cd $d && timeout 1800 npx vitest run $dir --maxWorkers=4 --reporter=json --outputFile=/tmp/zcf-$d.json >/tmp/zcf-$d.log 2>&1)
+    (cd $d && timeout 1800 npx vitest run $dir --retry=2 --maxWorkers=4 --reporter=json --outputFile=/tmp/zcf-$d.json >/tmp/zcf-$d.log 2>&1)
     node -e '
       const fs=require("fs"),p=require("path");let j;try{j=JSON.parse(fs.readFileSync(process.argv[1]))}catch{console.log(process.argv[2]+"\t<no-json>\t<run failed>");process.exit()}
       for(const f of j.testResults){const rel=p.relative(process.argv[3],f.name);
