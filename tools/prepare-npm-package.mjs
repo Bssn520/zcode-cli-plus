@@ -91,6 +91,19 @@ const commandName = binNames[0];
 if (typeof pkg.version !== "string" || pkg.version.trim() === "") {
   throw new Error("npm/package.json must define a non-empty string version");
 }
+if (pkg.version.startsWith("0.0.0")) {
+  throw new Error(
+    `refused to prepare package: version must not start with 0.0.0 (got ${pkg.version})`,
+  );
+}
+const releasePleaseManifest = JSON.parse(
+  await readFile(resolve(root, ".release-please-manifest.json"), "utf8"),
+);
+if (releasePleaseManifest.npm !== pkg.version) {
+  throw new Error(
+    `refused to prepare package: .release-please-manifest.json "npm" (${JSON.stringify(releasePleaseManifest.npm)}) must equal npm/package.json version (${JSON.stringify(pkg.version)})`,
+  );
+}
 const upstreamPkg = JSON.parse(
   await readFile(resolve(root, "apps/zcode-cli/package.json"), "utf8"),
 );
