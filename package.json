@@ -1,0 +1,48 @@
+{
+  "name": "zcode-cli-plus-workspace",
+  "version": "3.15.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --dir apps/zcode-cli build",
+    "cli:build": "pnpm --dir apps/zcode-cli cli:build",
+    "test": "pnpm --dir apps/zcode-cli test",
+    "typecheck": "pnpm --dir apps/zcode-cli typecheck",
+    "lint": "pnpm --dir apps/zcode-cli lint",
+    "build:sea": "pnpm --dir apps/zcode-cli build:sea",
+    "release:cli": "pnpm --dir apps/zcode-cli run release",
+    "release:cli:dry": "pnpm --dir apps/zcode-cli run release:dry"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1",
+    "tsx": "^4.19.4",
+    "turbo": "^2.4.0",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.57.0",
+    "postject": "1.0.0-alpha.6",
+    "release-it": "^19.2.4",
+    "@release-it/conventional-changelog": "^10.0.6",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
+    "conventional-changelog-writer": "^8.4.0",
+    "dotenv": "^17.4.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "pnpm": {
+    "overrides": {
+      "react": "19.2.7",
+      "react-dom": "19.2.7"
+    },
+    "patchedDependencies": {
+      "vitest@4.1.7": "patches/vitest@4.1.7.patch",
+      "@ai-sdk/openai-compatible@2.0.60": "patches/@ai-sdk__openai-compatible@2.0.60.patch",
+      "@ai-sdk/anthropic@3.0.81": "patches/@ai-sdk__anthropic@3.0.81.patch"
+    }
+  },
+  "license": "Apache-2.0"
+}
