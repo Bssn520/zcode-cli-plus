@@ -51,6 +51,13 @@ jobs:
           fi
       - name: Build
         # Smoke needs the CLI binary; always build zcode-cli (affected applies to typecheck/test).
+        # Several plugin packages (browser-use-plugin writes scripts/browser-client.mjs + dist-types/,
+        # plugin assets used by @zcode/bootstrap bundled-plugins tests and @zcode/cli build-sea) emit
+        # build outputs outside the declared turbo outputs (dist/**), so a turbo cache hit restored
+        # from actions/cache skips the build and leaves those assets missing; force until outputs
+        # are declared upstream.
+        env:
+          TURBO_FORCE: "true"
         run: pnpm --filter zcode-cli build
       - name: Smoke
         run: |
