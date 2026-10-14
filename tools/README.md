@@ -4,7 +4,8 @@
 | --- | --- |
 | `sync-upstream.sh` | 从上游 `zai-org/ZCode` 检出里抽取 CLI 精简切片到目标仓库 |
 | `derive-cli-lockfile.mjs` | 从根 `pnpm-lock.yaml` 派生 `apps/zcode-cli/pnpm-lock.yaml`（turbo 根） |
-| `prepare-npm-package.mjs` | 组装发布目录 `.npm-package/`（读 `npm/package.json`）；改写 `dist/zcode.cjs` 注入发布版 `version` 与 `bin` 命令名 |
+| `prepare-npm-package.mjs` | 组装发布目录 `.npm-package/`（读 `npm/package.json`）；改写 `dist/zcode.cjs` 注入发布版 `version` 与 `bin` 命令名；打包 `dist/tui/` 并改写 `@zcode/tui` 导入；审计裸模块依赖 |
+| `verify-npm-package.sh` | 对 `.npm-package` 执行 `npm pack` → 临时 prefix 全局安装 → `zcp --version` → tmux/script 伪终端启动 TUI 冒烟 |
 门禁脚本与已知失败清单在 `ci/`（fork 资产），不在本目录。
 
 ## 发布包 branding 注入
@@ -16,6 +17,16 @@
 - 把上游 version 的 3 处 `__CLI_VERSION__` 字面量换成 `npm/package.json` 的 version（`--version` + 两处 runtime 缓存目录）
 - 把 `CLI_COMMAND_NAME`、help banner/usage、中英文 help 正文、子命令 `Usage: zcode …` 换成 `npm/package.json` 唯一的 `bin` 名（当前为 `zcp`）
 - 跑一遍准备好的 bundle 的 `--version` / `--help` 做冒烟校验
+- 把 `apps/zcode-cli/packages/tui/dist` 复制到发布包 `dist/tui/`（排除 `.map` / `.d.ts`），并把 `import("@zcode/tui")` 改写成基于 `__dirname` 的 `file:` URL
+- 用 meriyah 扫描 `dist/zcode.cjs` 与 `dist/tui/index.js` 的裸模块导入，未在 `npm/package.json` dependencies 声明则失败
+
+本地校验发布包（CI / `ci/run-ci-local.sh` 同样会跑）：
+
+```bash
+pnpm --filter zcode-cli build
+node tools/prepare-npm-package.mjs .npm-package
+bash tools/verify-npm-package.sh .npm-package
+```
 
 不改 `apps/` 源码，因此 `tools/sync-upstream.sh` 不受影响。若上游打包后的字面量形态变了，prepare 会失败，需按新产物更新替换模式。
 

@@ -295,7 +295,7 @@ function submitSelectedItem(
   void submitValue(item.command);
 }
 
-function printableInputText(key: KeyEvent): string | undefined {
+export function printableInputText(key: KeyEvent): string | undefined {
   const character = printableKey(key);
   if (character) return character;
   if (key.ctrl || key.meta || CONTROL_KEY_NAMES.has(key.name)) return undefined;

@@ -2,7 +2,7 @@ import type { PermissionBrokerResult, SupportedLocale } from "@zcode/contracts";
 import type { KeyEvent } from "@mbears/opentui-core";
 import type React from "react";
 import { getZCodeCopy } from "@zcode/i18n";
-import { clampIndex, printableKey } from "./app-input.js";
+import { clampIndex, printableInputText, printableKey } from "./app-input.js";
 import type { ApprovalPrompt, PlanApprovalComment, PlanApprovalState } from "./app-model.js";
 import {
   editPlanInExternalEditor,
@@ -88,9 +88,13 @@ export function handlePlanApprovalKey(
   if (!state) return;
 
   const update = (recipe: (draft: PlanApprovalState) => void) => {
+    // 根因：同一次渲染里连续按键会共用旧的 approval 引用；按对象身份匹配时，
+    // 第一次 update 换掉队列项后后续字符全部丢失。改为 requestId 匹配。
     setApprovalQueue((current) =>
       current.map((item) => {
-        if (item !== approval || !item.planApprovalState) return item;
+        if (item.request.requestId !== approval.request.requestId || !item.planApprovalState) {
+          return item;
+        }
         const nextState = clonePlanApprovalState(item.planApprovalState);
         recipe(nextState);
         return { ...item, planApprovalState: nextState };
@@ -99,7 +103,7 @@ export function handlePlanApprovalKey(
   };
 
   if (state.mode === "comment") {
-    handleCommentKey(key, state, update, setStatus);
+    handleCommentKey(key, update, setStatus);
     return;
   }
   if (state.mode === "review") {
@@ -236,7 +240,6 @@ export function handlePlanApprovalKey(
 
 function handleCommentKey(
   key: KeyEvent,
-  state: PlanApprovalState,
   update: (recipe: (draft: PlanApprovalState) => void) => void,
   setStatus: (status: string) => void,
 ): void {
@@ -251,15 +254,12 @@ function handleCommentKey(
   }
 
   if (key.name === "return") {
-    const text = state.commentBuffer.trim();
-    if (!text) {
-      setStatus("Comment cannot be empty.");
-      return;
-    }
-    const target = state.commentTarget;
-    if (!target) return;
-    const steps = parsePlanPreview(state.draftPlan).steps;
+    let attached = false;
     update((draft) => {
+      const text = draft.commentBuffer.trim();
+      const target = draft.commentTarget;
+      if (!text || !target) return;
+      const steps = parsePlanPreview(draft.draftPlan).steps;
       const comment: PlanApprovalComment =
         target.kind === "step"
           ? {
@@ -278,8 +278,9 @@ function handleCommentKey(
       draft.mode = "browse";
       draft.commentBuffer = "";
       draft.commentTarget = null;
+      attached = true;
     });
-    setStatus("Comment attached.");
+    setStatus(attached ? "Comment attached." : "Comment cannot be empty.");
     return;
   }
 
@@ -290,11 +291,41 @@ function handleCommentKey(
     return;
   }
 
-  const character = printableKey(key);
-  if (!character) return;
+  const text = printableInputText(key);
+  if (!text) return;
   update((draft) => {
-    draft.commentBuffer += character;
+    draft.commentBuffer += text;
   });
+}
+
+export function appendPlanApprovalCommentText(
+  text: string,
+  approval: ApprovalPrompt,
+  setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
+): boolean {
+  const state = approval.planApprovalState;
+  if (!state || state.mode !== "comment") return false;
+  const chunk = normalizeCommentInputText(text);
+  if (!chunk) return false;
+  setApprovalQueue((current) =>
+    current.map((item) => {
+      if (item.request.requestId !== approval.request.requestId || !item.planApprovalState) {
+        return item;
+      }
+      if (item.planApprovalState.mode !== "comment") return item;
+      const nextState = clonePlanApprovalState(item.planApprovalState);
+      nextState.commentBuffer += chunk;
+      return { ...item, planApprovalState: nextState };
+    }),
+  );
+  return true;
+}
+
+function normalizeCommentInputText(text: string): string {
+  return [...text.replace(/\r\n?/g, "\n")]
+    .map((char) => (char === "\n" ? " " : char))
+    .filter((char) => char >= " " && char !== "\x7f")
+    .join("");
 }
 
 function handleReviewKey(
