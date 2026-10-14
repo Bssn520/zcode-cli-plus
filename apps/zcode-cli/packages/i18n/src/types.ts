@@ -316,7 +316,7 @@ export interface TuiCopy {
     noteMarker: string;
     stepCount(count: number): string;
     commentCount(count: number): string;
-    help: string;
+    help(commentCount: number): string;
     commentStepTitle(index: number): string;
     commentOverallTitle: string;
     commentHelp: string;

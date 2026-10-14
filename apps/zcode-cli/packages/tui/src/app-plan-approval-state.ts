@@ -121,6 +121,11 @@ export function handlePlanApprovalKey(
   }
 
   if (key.name === "return") {
+    // 有评论时 Enter 应发送反馈，不能静默批准丢掉评论文本。
+    if (state.comments.length > 0) {
+      sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus);
+      return;
+    }
     resolvePlanApproval(
       approval,
       setApprovalQueue,
@@ -349,13 +354,7 @@ function handleReviewKey(
       setStatus("No comments to send.");
       return;
     }
-    resolvePlanApproval(approval, setApprovalQueue, setStatus, {
-      decision: "deny",
-      preserveReasonFormatting: true,
-      reason: composePlanFeedbackReason(state.comments),
-      reasonSource: "plan_approval_feedback",
-      resolvedAt: new Date(),
-    });
+    sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus);
     return;
   }
 
@@ -389,6 +388,21 @@ function handleReviewKey(
     });
     setStatus("Comment deleted.");
   }
+}
+
+function sendPlanApprovalFeedback(
+  approval: ApprovalPrompt,
+  state: PlanApprovalState,
+  setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
+  setStatus: (status: string) => void,
+): void {
+  resolvePlanApproval(approval, setApprovalQueue, setStatus, {
+    decision: "deny",
+    preserveReasonFormatting: true,
+    reason: composePlanFeedbackReason(state.comments),
+    reasonSource: "plan_approval_feedback",
+    resolvedAt: new Date(),
+  });
 }
 
 function resolvePlanApproval(

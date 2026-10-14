@@ -372,7 +372,10 @@ Slash Commands:
       noteMarker: "备注",
       stepCount: (count) => `${count} 个步骤`,
       commentCount: (count) => `${count} 条意见`,
-      help: "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
+      help: (commentCount) =>
+        commentCount > 0
+          ? `Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 发送意见（${commentCount} 条） · Esc 取消 · j/k 选择`
+          : "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
       commentStepTitle: (index) => `步骤 ${index} 的意见`,
       commentOverallTitle: "整体计划意见",
       commentHelp: "Enter 挂上 · Esc 返回",
