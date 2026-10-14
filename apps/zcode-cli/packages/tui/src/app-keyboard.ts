@@ -1,9 +1,10 @@
-import type { KeyEvent } from "@mbears/opentui-core";
+import { decodePasteBytes, type KeyEvent } from "@mbears/opentui-core";
 import type { TuiWorkflowExpansionControls } from "./app-workflow-controller.js";
-import { useKeyboard } from "@mbears/opentui-react";
+import { useKeyboard, usePaste } from "@mbears/opentui-react";
 import { useCallback, useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { handleApprovalKey } from "./app-approval.js";
+import { appendPlanApprovalCommentText } from "./app-plan-approval-state.js";
 import { handleSelectionKey } from "./app-input.js";
 import {
   CTRL_C_EXIT_PROMPT,
@@ -146,6 +147,23 @@ export function useTuiKeyboardControls({
   const ctrlCExitGuardRef = useRef<CtrlCExitGuard>(createCtrlCExitGuard());
   const sidebarShortcutRef = useRef<SidebarShortcutState>(createSidebarShortcutState());
 
+  usePaste(
+    useCallback(
+      (event) => {
+        const approval = approvalQueue[0];
+        if (!approval?.planApprovalState || approval.planApprovalState.mode !== "comment") {
+          return;
+        }
+        if (
+          appendPlanApprovalCommentText(decodePasteBytes(event.bytes), approval, setApprovalQueue)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      },
+      [approvalQueue, setApprovalQueue],
+    ),
+  );
   useKeyboard(
     useCallback(
       (key: KeyEvent) => {

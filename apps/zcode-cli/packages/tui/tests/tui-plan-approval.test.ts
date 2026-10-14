@@ -9,6 +9,7 @@ import { testRender } from "@mbears/opentui-react/test-utils";
 import React, { act } from "react";
 import type { ApprovalPrompt } from "../src/app-model.js";
 import {
+  appendPlanApprovalCommentText,
   composePlanFeedbackReason,
   createPlanApprovalResult,
   createPlanApprovalState,
@@ -175,6 +176,58 @@ test("key map has Ctrl+G edit and no e/F bindings", () => {
   assert.match(harness.state.draftPlan, /changed/u);
 });
 
+test("comment buffer keeps every char when approval object is stale across key events", () => {
+  let queue: ApprovalPrompt[] = [];
+  const approval: ApprovalPrompt = {
+    cleanup: () => undefined,
+    planApprovalState: createPlanApprovalState(SAMPLE_PLAN),
+    reject: () => undefined,
+    request: fakeRequest(SAMPLE_PLAN),
+    resolve: () => undefined,
+    selectedDecision: "deny",
+  };
+  queue = [approval];
+  const setQueue = (update: React.SetStateAction<ApprovalPrompt[]>) => {
+    queue = typeof update === "function" ? update(queue) : update;
+  };
+
+  handlePlanApprovalKey({ name: "g", sequence: "g" } as KeyEvent, queue[0]!, setQueue, () => undefined);
+  const stale = queue[0];
+  assert.ok(stale);
+
+  for (const name of ["h", "e", "l", "l", "o"]) {
+    handlePlanApprovalKey({ name, sequence: name } as KeyEvent, stale, setQueue, () => undefined);
+  }
+  // Multi-char sequence in one key event (non-bracketed burst / paste-as-key).
+  handlePlanApprovalKey(
+    { name: "", sequence: " world" } as KeyEvent,
+    stale,
+    setQueue,
+    () => undefined,
+  );
+
+  assert.equal(queue[0]?.planApprovalState?.commentBuffer, "hello world");
+});
+
+test("comment buffer accepts bracketed-paste text including newlines as spaces", () => {
+  let queue: ApprovalPrompt[] = [];
+  const prompt: ApprovalPrompt = {
+    cleanup: () => undefined,
+    planApprovalState: createPlanApprovalState(SAMPLE_PLAN),
+    reject: () => undefined,
+    request: fakeRequest(SAMPLE_PLAN),
+    resolve: () => undefined,
+    selectedDecision: "deny",
+  };
+  queue = [prompt];
+  const setQueue = (update: React.SetStateAction<ApprovalPrompt[]>) => {
+    queue = typeof update === "function" ? update(queue) : update;
+  };
+  handlePlanApprovalKey({ name: "g", sequence: "g" } as KeyEvent, queue[0]!, setQueue, () => undefined);
+  const stale = queue[0]!;
+  assert.equal(appendPlanApprovalCommentText("alpha\nbeta\r\ngamma", stale, setQueue), true);
+  assert.equal(queue[0]?.planApprovalState?.commentBuffer, "alpha beta gamma");
+});
 test("unsplittable plan still renders preview without section error", () => {
   const plan = "Plain prose plan without structured sections.";
   const lines = collectTextNodes(PlanApprovalPanelView({ state: createPlanApprovalState(plan) }));
