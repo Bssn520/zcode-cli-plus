@@ -375,7 +375,10 @@ Slash Commands:
       noteMarker: "note",
       stepCount: (count) => `${count} steps`,
       commentCount: (count) => `${count} comments`,
-      help: "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select",
+      help: (commentCount) =>
+        commentCount > 0
+          ? `Ctrl+G edit · f step comment · g overall · r review · Enter send feedback (${commentCount} comments) · Esc cancel · j/k select`
+          : "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select",
       commentStepTitle: (index) => `Feedback on step ${index}`,
       commentOverallTitle: "Overall plan feedback",
       commentHelp: "Enter attaches · Esc back",
@@ -385,6 +388,8 @@ Slash Commands:
       overallCommentSummary: (text) => `[general] ${text}`,
       editorNotFound: "No editor found: set $VISUAL or $EDITOR",
       editorFailed: (message) => `Could not open editor: ${message}`,
+      feedbackModifiedPlan: (plan) =>
+        `User modified the plan. The updated plan is as follows:\n${plan}`,
     },
   },
 };

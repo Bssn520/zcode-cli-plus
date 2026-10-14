@@ -372,7 +372,10 @@ Slash Commands:
       noteMarker: "备注",
       stepCount: (count) => `${count} 个步骤`,
       commentCount: (count) => `${count} 条意见`,
-      help: "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
+      help: (commentCount) =>
+        commentCount > 0
+          ? `Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 发送意见（${commentCount} 条） · Esc 取消 · j/k 选择`
+          : "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
       commentStepTitle: (index) => `步骤 ${index} 的意见`,
       commentOverallTitle: "整体计划意见",
       commentHelp: "Enter 挂上 · Esc 返回",
@@ -382,6 +385,7 @@ Slash Commands:
       overallCommentSummary: (text) => `[整体] ${text}`,
       editorNotFound: "未找到编辑器：请设置 $VISUAL 或 $EDITOR",
       editorFailed: (message) => `无法打开编辑器：${message}`,
+      feedbackModifiedPlan: (plan) => `用户已修改计划，修改后的计划如下：\n${plan}`,
     },
   },
 };

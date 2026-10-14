@@ -162,7 +162,7 @@ export function PlanApprovalPanelView({
     footerRows.push(textRow("meta", footerBits.join(" · "), palette.muted));
   }
   const rowContentWidth = normalizePlanApprovalContentWidth(contentWidth);
-  const helpLines = wrapPlanApprovalHints(text.help, rowContentWidth);
+  const helpLines = wrapPlanApprovalHints(text.help(state.comments.length), rowContentWidth);
   for (const [index, line] of helpLines.entries()) {
     footerRows.push(textRow(`help-${index}`, line, palette.muted));
   }

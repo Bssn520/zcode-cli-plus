@@ -131,6 +131,99 @@ test("accumulates step and overall comments then sends feedback", () => {
   assert.match(harness.result?.reason ?? "", /\[step 2\].*need coverage/u);
   assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
 });
+test("Enter with comments sends plan_approval_feedback without opening review", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  harness.press("f");
+  for (const ch of "need coverage") harness.press(ch);
+  harness.press("return");
+  harness.press("g");
+  for (const ch of "prefer smaller PR") harness.press(ch);
+  harness.press("return");
+  assert.equal(harness.state.mode, "browse");
+  assert.equal(harness.state.comments.length, 2);
+
+  harness.press("return");
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.equal(harness.result?.preserveReasonFormatting, true);
+  assert.match(harness.result?.reason ?? "", /\[step 1\].*need coverage/u);
+  assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
+});
+
+test("Enter with comments and edited plan appends updated plan to feedback reason", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const edited = `${SAMPLE_PLAN}\nEdited in VISUAL.\n`;
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ plan: edited, status: "updated" }),
+    },
+  );
+  harness.press("g");
+  for (const ch of "shrink scope") harness.press(ch);
+  harness.press("return");
+  harness.press("return", {}, { locale: "en-US" });
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
+  assert.match(
+    harness.result?.reason ?? "",
+    /User modified the plan\. The updated plan is as follows:\n[\s\S]*Edited in VISUAL\./u,
+  );
+  assert.equal(harness.result?.modifiedInput, undefined);
+});
+
+test("review feedback with edited plan appends zh-CN updated plan text", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const edited = `${SAMPLE_PLAN}\n改过的计划\n`;
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ plan: edited, status: "updated" }),
+    },
+  );
+  harness.press("g");
+  for (const ch of "shrink scope") harness.press(ch);
+  harness.press("return");
+  harness.press("r");
+  harness.press("return", {}, { locale: "zh-CN" });
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
+  assert.match(
+    harness.result?.reason ?? "",
+    /用户已修改计划，修改后的计划如下：\n[\s\S]*改过的计划/u,
+  );
+});
+
+test("Enter without comments still approves", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  harness.press("return");
+  assert.equal(harness.result?.decision, "allow");
+  assert.equal(harness.result?.reasonSource, undefined);
+  assert.equal(harness.result?.modifiedInput, undefined);
+});
+
+test("browse help switches Enter action when comments exist", () => {
+  const without = DEFAULT_TUI_COPY.planApproval.help(0);
+  const withComments = DEFAULT_TUI_COPY.planApproval.help(2);
+  assert.match(without, /Enter approve/u);
+  assert.doesNotMatch(without, /send feedback/u);
+  assert.match(withComments, /Enter send feedback \(2 comments\)/u);
+
+  const state = createPlanApprovalState(SAMPLE_PLAN);
+  state.comments = [{ id: "1", kind: "overall", text: "shrink scope" }];
+  const panelText = collectTextNodes(PlanApprovalPanelView({ state }))
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Enter send feedback \(1 comments\)/u);
+});
+
 
 test("review can delete a single comment before send", () => {
   const harness = createHarness(SAMPLE_PLAN);
@@ -260,7 +353,7 @@ test("composePlanFeedbackReason keeps step anchors", () => {
 });
 
 test("plan approval help wraps at hint boundaries on narrow widths", () => {
-  const help = DEFAULT_TUI_COPY.planApproval.help;
+  const help = DEFAULT_TUI_COPY.planApproval.help(0);
   const hints = help.split(" · ");
   const requiredKeys = ["Ctrl+G", "Enter", "Esc", "j/k"];
   // letter hints need word-ish checks so "g" does not match inside "Ctrl+G"
@@ -303,7 +396,7 @@ test("plan approval help wraps at hint boundaries on narrow widths", () => {
 });
 
 test("plan approval panel stacks rows without overlap in opentui renderer", async () => {
-  const help = DEFAULT_TUI_COPY.planApproval.help;
+  const help = DEFAULT_TUI_COPY.planApproval.help(0);
   const cases = [
     { width: 120, height: 40, contentWidth: 100 },
     { width: 50, height: 40, contentWidth: 46 },
