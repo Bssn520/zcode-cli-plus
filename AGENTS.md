@@ -6,10 +6,17 @@ CLI 内部的详细规范见 [`apps/zcode-cli/AGENTS.md`](apps/zcode-cli/AGENTS.
 
 ## 分支模型
 
-- `upstream`：只放上游原始快照，**只能**由 `tools/sync-upstream.sh` 生成，每个上游 tag 一个提交（`sync: upstream ZCode <tag>`）。禁止手改。
-- `main`：我们的代码。通过合并 `upstream` 跟进上游。
-- 功能分支：从 `main` 切出，**一个功能一个分支、一个 PR**；命名 `feat/…`、`fix/…`、`chore/…`、`docs/…`。
+- `upstream`：只放上游原始快照，**只能**由 `tools/sync-upstream.sh` 生成（每周由 `upstream-sync.yml` 检查新 tag），每个上游 tag 一个提交（`sync: upstream ZCode <tag>`），通过 PR `upstream → dev` 合入。禁止手改。
+- `dev`：日常开发集成分支。功能分支从 `dev` 切出、PR 回 `dev`。
+- `main`：发布分支。只通过 PR `dev → main`（merge commit）更新；release-please 在 `main` 上维护发布 PR 和 CHANGELOG，合并发布 PR 后自动发布 npm。
+- 功能分支：**一个功能一个分支、一个 PR**；命名 `feat/…`、`fix/…`、`chore/…`、`docs/…`。
+- 提交信息使用 Conventional Commits（`feat:`、`fix:`、`chore:`…），release-please 据此生成版本号和 CHANGELOG。
 - 抽取导致的问题（缺文件、路径、未声明依赖）在 `tools/sync-upstream.sh` 里修，不在 `upstream` 上手改。
+
+## 发布
+
+- 发布包 `@bssn520/zcode-cli-plus` 的描述和版本在 `npm/package.json`（release-please 版本源），由 `tools/prepare-npm-package.mjs` 把构建产物组装成发布目录；上游 `@zcode/cli` 的 package.json 不改。
+- `release.yml` 使用 npm Trusted Publishing（OIDC）+ `--provenance`，不使用 NPM_TOKEN。
 
 ## 最小化上游文件差异
 

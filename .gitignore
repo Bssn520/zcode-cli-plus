@@ -73,3 +73,6 @@ packages/desktop/resources/macos-window-bounds/
 __pycache__/
 *.pyc
 .zcode-runtime
+
+# 发布包组装目录
+.npm-package/

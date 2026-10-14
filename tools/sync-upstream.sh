@@ -12,7 +12,7 @@ PKGS=(shared provider provider-node model-option-map zcode-cua formal-proof)
 DIRS=(apps/zcode-cli third-party config)
 for p in "${PKGS[@]}"; do DIRS+=("packages/$p"); done
 ROOT_FILES=(LICENSE NOTICE.md THIRD-PARTY-NOTICES.md .npmrc .nvmrc .gitattributes .gitignore
-  tsconfig.base.json .env.production .env.development .env.example pnpm-lock.yaml)
+  tsconfig.base.json .oxlintrc.json .env.production .env.development .env.example pnpm-lock.yaml)
 PATCHES=("vitest@4.1.7.patch" "@ai-sdk__openai-compatible@2.0.60.patch" "@ai-sdk__anthropic@3.0.81.patch")
 
 copy_dir() { rm -rf "$DST/$1"; mkdir -p "$(dirname "$DST/$1")"
