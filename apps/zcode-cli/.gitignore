@@ -21,3 +21,6 @@ packages/**/tests/**/*.d.ts.map
 .VSCodeCounter
 vendor
 !packages/visualize-plugin/skills/visualize/assets/vendor/
+
+# zcode-cli-plus: commit vitest file snapshots (generated from clean upstream at the synced tag)
+!packages/**/tests/**/expected/*.js

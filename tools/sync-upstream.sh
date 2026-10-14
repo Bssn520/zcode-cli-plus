@@ -52,6 +52,10 @@ rm -f /tmp/zsync*.$$
 
 # Fork-owned .gitignore additions.
 printf '\n# 发布包组装目录\n.npm-package/\n' >> "$DST/.gitignore"
+# Upstream's apps/zcode-cli/.gitignore ignores packages/**/tests/**/*.js, which also hides the
+# toMatchFileSnapshot fixtures; vitest refuses to write missing snapshots under CI=true.
+# We commit them (generated from a clean upstream checkout at the synced tag).
+printf '\n# zcode-cli-plus: commit vitest file snapshots (generated from clean upstream at the synced tag)\n!packages/**/tests/**/expected/*.js\n' >> "$DST/apps/zcode-cli/.gitignore"
 
 # Our CI test gate (not upstream): known upstream failures for this tag + runner.
 mkdir -p "$DST/ci"
@@ -95,4 +99,6 @@ if [ "${NO_LOCK:-0}" != 1 ]; then (cd "$DST" && pnpm install --lockfile-only --i
 # derive it from the root lockfile so every CLI workspace package is present (no turbo warnings).
 node "$TOOLS/derive-cli-lockfile.mjs" "$DST/pnpm-lock.yaml" "$DST/apps/zcode-cli/pnpm-lock.yaml"
 cp "$TOOLS/run-ci-local.sh" "$DST/ci/"
+[ -n "$(ls "$DST"/apps/zcode-cli/packages/dynamic-workflow/tests/lowering/expected/*.js 2>/dev/null)" ] || \
+  echo "WARN: lowering snapshots missing; run dynamic-workflow tests (CI unset) in a clean upstream checkout at $TAG and copy tests/lowering/expected/" >&2
 echo "synced $TAG -> $DST"
