@@ -73,3 +73,8 @@ packages/desktop/resources/macos-window-bounds/
 __pycache__/
 *.pyc
 .zcode-runtime
+
+# >>> zcode-cli-plus:root
+.npm-package/
+!packages/**/tests/**/expected/*.js
+# <<< zcode-cli-plus:root
