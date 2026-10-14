@@ -94,9 +94,11 @@ type UseTuiKeyboardControlsOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
   slashSelection: SlashSelectionState | undefined;
   submitValue: (value: string, options?: SubmitValueOptions) => Promise<void>;
+  suspendTerminal?: import("./app-plan-editor.js").SuspendTerminal;
   switchMode: () => void;
   toggleSidebar: () => boolean;
   toggleSidebarSection: (section: SidebarSectionId) => boolean;
+  locale?: import("@zcode/contracts").SupportedLocale;
 };
 
 export function useTuiKeyboardControls({
@@ -135,9 +137,11 @@ export function useTuiKeyboardControls({
   setStatus,
   slashSelection,
   submitValue,
+  suspendTerminal,
   switchMode,
   toggleSidebar,
   toggleSidebarSection,
+  locale,
 }: UseTuiKeyboardControlsOptions): void {
   const ctrlCExitGuardRef = useRef<CtrlCExitGuard>(createCtrlCExitGuard());
   const sidebarShortcutRef = useRef<SidebarShortcutState>(createSidebarShortcutState());
@@ -179,7 +183,10 @@ export function useTuiKeyboardControls({
         if (approval) {
           resetCtrlCExitGuard(ctrlCExitGuardRef.current);
           consumeKey(key);
-          handleApprovalKey(key, approval, setApprovalQueue, setStatus);
+          handleApprovalKey(key, approval, setApprovalQueue, setStatus, {
+            locale,
+            suspendTerminal,
+          });
           return;
         }
 
@@ -454,9 +461,11 @@ export function useTuiKeyboardControls({
         setStatus,
         slashSelection,
         submitValue,
+        suspendTerminal,
         switchMode,
         toggleSidebar,
         toggleSidebarSection,
+        locale,
       ],
     ),
   );
