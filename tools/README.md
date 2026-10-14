@@ -24,3 +24,11 @@ git add -A && git commit -m "sync: upstream ZCode <tag>"
 抽取引起的问题一律改脚本修，不要在 `upstream` 分支手改。
 
 升级 tag 后在 `dev` 上重新生成 `ci/known-failures.tsv`（见 `ci/collect-failures.sh`）。
+
+## node-repl-host 的 `@modelcontextprotocol/sdk` patch
+
+`tools/sync-upstream.sh`（约 109–111 行）在每次同步时，会给 `apps/zcode-cli/packages/node-repl-host/package.json` 加上 devDependency `@modelcontextprotocol/sdk@1.29.0`。
+
+原因：`src/cua-bridge.ts` 直接 import 该包，上游完整仓库里它只通过 GUI 的 shadcn 依赖被 hoist；本切片去掉 GUI 后就会缺包。若改加到根 `package.json`，会触发 TS2589。
+
+该改动由 sync 脚本每次重写，因此不会与上游同步产生冲突。

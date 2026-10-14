@@ -1,7 +1,9 @@
-# package	file	test	upstream_tag	status	note  (fail = deterministic; flaky = intermittent under parallel load; note required for slice-specific)
+# package	file	test	upstream_tag	status	note  (fail = deterministic; flaky = intermittent under parallel load; ci-env = fails only on GitHub CI runner)
 @zcode/adapters	tests/builtin-mcs-search-wire.test.ts	Published MCS and search final Anthropic wire account:bigmodel-offpeak-idle-plan / https://zcode.z.ai/api/v1/off-peak/anthropic / GLM-5.3-Flash	v3.15.1	fail	
 @zcode/adapters	tests/builtin-mcs-search-wire.test.ts	Published MCS and search final Anthropic wire account:zai-offpeak-idle-plan / https://zcode.z.ai/api/v1/off-peak/anthropic / GLM-5.3-Flash	v3.15.1	fail	
 @zcode/adapters	tests/config.test.ts	<file load error>	v3.15.1	fail	
+@zcode/adapters	tests/exec.test.ts	NodeExecutionAdapter timeout 只约束子进程运行阶段，准备较慢的命令不会未启动就被判 timed_out	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/adapters	tests/mcp-oauth-cross-process.e2e.test.ts	MCP OAuth cross-process end-to-end completes authorization that outlasts the caller budget (incident timeline replay)	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB01' resolves model capability undefined to 32000	v3.15.1	fail	
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB02' resolves model capability 16000 to 16000	v3.15.1	fail	
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB03' resolves model capability 64000 to 64000	v3.15.1	fail	
@@ -47,7 +49,12 @@
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions unwraps OpenAI-compatible extra_body into the SDK provider namespace	v3.15.1	fail	
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions uses merged Responses provider options while transforming history	v3.15.1	fail	
 @zcode/adapters	tests/runner-options.test.ts	shouldIncludeStreamResponseBody enables responseBody capture for zcode-plan openai-compatible providers	v3.15.1	fail	
+@zcode/adapters	tests/session-store.test.ts	SQLite session store allows two Agent processes to migrate the same new database concurrently	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/app-subagent-legacy-init.test.ts	App 初始化旧 Subagent 身份 用户目录完成原地迁移再构造 Runtime；项目文件不迁移也不暗中换身份	v3.15.1	fail	
+@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	dynamic workflow run service — 留白（FillWorkflowHole） 冷回放为 hole-reached 铸出与 live 逐字节相同的载荷（type 从行里的有效脚本重建）	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	dynamic workflow run service — 留白（FillWorkflowHole） 十步的尾巴留白接龙跑到完成：每一步一个名字键 id，深度不进 id，所有 id 都在 64 字符以内	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/dynamic-workflow-skill.test.ts	bundled dynamic-workflows skill compiles every script block marked as complete	v3.15.1	ci-env	用户不使用该功能 (feature unused); CI-only failure
+@zcode/bootstrap	tests/fault-matrix-harness.test.ts	fault matrix harness — B1 healthy @ W2 driver 级：completed，请求数 = 逻辑请求数，闸门与时钟接上	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig Standalone 与 Desktop 一样丢弃内置套餐配置，API 只迁 Key	v3.15.1	fail	
 @zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 不把只有 model 选择、没有 provider 定义的内容迁成 Provider	v3.15.1	fail	
 @zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 不把旧 CLI 中已退出产品的 ZAPI 迁成 Personal Provider	v3.15.1	fail	
@@ -57,7 +64,10 @@
 @zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 忽略旧 model options 中没有正式语义的任意字段	v3.15.1	fail	
 @zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 忽略没有生产消费方的 reasoning replay 元数据	v3.15.1	fail	
 @zcode/bootstrap	tests/model-default-headers-wire.test.ts	模型请求默认 Header：Bootstrap → Adapter → 真实 SDK 真实 Runtime 标题 sidecar 沿公共工厂携带版本、other 类型和会话追踪	v3.15.1	fail	
+@zcode/bootstrap	tests/provider-registry-app-runtime.test.ts	ZCode App Provider Registry runtime Expert Workflow 子 Runtime 继续使用进程 Registry 的 ModelFactory	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/provider-registry-app-runtime.test.ts	ZCode App Provider Registry runtime Registry 模式的 Workflow 子 Runtime 复用主 App Adapter	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
 @zcode/bootstrap	tests/provider-registry-selection.test.ts	listRegistryBackedModels 直接把 Registry 事实投影为协议 Model Option，不建立内部 alias DTO	v3.15.1	fail	
+@zcode/bootstrap	tests/provider-runtime-headers-cancel.test.ts	真实工厂同样装配唯一请求端口，完整账号事实透传而不写旧 ModelRef	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/read-pdf-model-switch.e2e.test.ts	Read PDF model capability switching E2E omits and restores raw PDF data in final provider requests	v3.15.1	fail	
 @zcode/bootstrap	tests/read-pdf.e2e.test.ts	Read PDF Poppler E2E runs the runtime descriptor and executor through Poppler in page order	v3.15.1	fail	
 @zcode/bootstrap	tests/read-pdf.e2e.test.ts	Read PDF provider and cold-resume E2E preserves the final Chat page order after a real runtime cold resume	v3.15.1	fail	
@@ -69,12 +79,17 @@
 @zcode/bootstrap	tests/session-persistence.test.ts	session persistence initializes the Bash shell snapshot before direct expert workflow child sessions	v3.15.1	fail	
 @zcode/bootstrap	tests/session-persistence.test.ts	session persistence routes AI SDK warnings away from ZCode Protocol stdout	v3.15.1	fail	
 @zcode/bootstrap	tests/session-persistence.test.ts	session persistence schedules log retention cleanup after ZCode Protocol startup completes	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence uses the current model for new expert workflow child sessions after a model switch	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
 @zcode/bootstrap	tests/v4-cold-resume.test.ts	v4 冷恢复（集成：真 sqlite + server + binder） 重启后冷订阅：优先从 Agent durable selection 恢复 task-local thought	v3.15.1	fail	
 @zcode/bootstrap	tests/v4-cold-resume.test.ts	v4 冷恢复（集成：真 sqlite + server + binder） 重启后冷订阅：旧 fork 消息缺档位时不借用相邻消息的档位	v3.15.1	fail	
 @zcode/bootstrap	tests/v4-cold-resume.test.ts	v4 冷恢复（集成：真 sqlite + server + binder） 重启后冷订阅：旧 transcript 无档位时留空，不读取 task-index 提示	v3.15.1	fail	
 @zcode/bootstrap	tests/v4-gateway.test.ts	projection 16MiB fault 与恢复 oversize model event 原子拒绝并只终止一次，TurnError 与 cold hydrate 均保持可传输	v3.15.1	flaky	timing/concurrency
 @zcode/bootstrap	tests/v4-gateway.test.ts	v4/command 收口 Core admission ACK 不等待 TurnStarted projection；旧 revision retry/file rewind 只 stale	v3.15.1	fail	
 @zcode/bootstrap	tests/v4-native-boundary.test.ts	v4 原生边界禁令（无桥） zcode-protocol-v4/ 下任何文件不得 import 旧协议目录（zcode-protocol/）	v3.15.1	fail	
+@zcode/bootstrap	tests/v4-native-interaction-background.test.ts	v4 原生 cancelBackgroundWork dwf run：workId 一路打到 DynamicWorkflowRunPort.cancel	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B1 healthy — 装配基线 W4/anthropic-messages：completed，请求数 = 逻辑请求数，零失败	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B3 failFirst(2P, 429) — 普通 429 限流在内重试 W4/anthropic-messages：completed，失败数 = N，请求数 = 逻辑请求数 + N	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B9 everyKth(3, stream_error 3008) — 流内业务码走同一策略 W4/anthropic-messages：completed，每个流内 3008 配一条 retry_scheduled{rate_limited}	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model API Key Personal Overlay 经 Registry 原样装配到 Adapter	v3.15.1	fail	
 @zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model Account 约束 Built-in 成员后仍由 Personal Overlay 最后覆盖	v3.15.1	fail	
 @zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model 隐藏 Request Auth Provider 仍由普通 Registry 精确创建 Model	v3.15.1	fail	
@@ -97,6 +112,9 @@
 @zcode/core	tests/runtime-unbound-resume.test.ts	未绑定模型的 Session 历史恢复 未选择模型的执行失败不调用 Factory，也不制造默认 Selection	v3.15.1	fail	
 @zcode/core	tests/subagent-background.test.ts	subagent background notifications drains pending background notifications as strict snapshot batches	v3.15.1	fail	
 @zcode/core	tests/tool-contracts.test.ts	tool contract declarations keeps built-in tool JSON schemas provider-compatible	v3.15.1	fail	
+@zcode/dynamic-workflow	tests/engine/engine.test.ts	WorkflowEngine — report restores the report count across resume so the cap is run-level	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/dynamic-workflow	tests/hole-sites.test.ts	a tail chain twenty fills deep keeps every fill stable and every id as short at step 20 as at step 1	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/dynamic-workflow	tests/hole-sites.test.ts	a tail chain twenty fills deep records each step's enclosing step in fill, so nesting survives without being spelled in the id	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/dynamic-workflow-runtime	tests/args.test.ts	args in the sandbox freezes the top level of the bag	v3.15.1	flaky	timing/concurrency; passed this collection run
 @zcode/tui	tests/tui-app.test.ts	Shift+Tab can cycle edit mode to yolo mode	v3.15.1	fail	
 @zcode/tui	tests/tui-app.test.ts	Shift+Tab switches mode through the injected mode setter	v3.15.1	fail	
