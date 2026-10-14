@@ -15,7 +15,7 @@ import {
   handlePlanApprovalKey,
 } from "../src/app-plan-approval-state.js";
 import { parsePlanPreview } from "../src/app-plan-parse.js";
-import { splitEditorCommand } from "../src/app-plan-editor.js";
+import { editPlanInExternalEditor, splitEditorCommand } from "../src/app-plan-editor.js";
 import { createSuspendTerminal } from "../src/suspend-terminal.js";
 import { displayWidth } from "../src/app-terminal-width.js";
 const SAMPLE_PLAN = `## Steps
@@ -372,7 +372,7 @@ test("resume reapplies terminal size after external editor", () => {
   assert.equal(repainted, true);
 });
 
-test("Ctrl+G editor error surfaces in status line", () => {
+test("Ctrl+G editor error surfaces in status line and panel", () => {
   const harness = createHarness(SAMPLE_PLAN);
   let status = "";
   harness.press(
@@ -380,12 +380,73 @@ test("Ctrl+G editor error surfaces in status line", () => {
     { ctrl: true },
     {
       editPlan: () => ({ message: "spawnSync vim ENOENT", status: "error" }),
+      locale: "en-US",
     },
     (next) => {
       status = next;
     },
   );
   assert.match(status, /Could not open editor:.*ENOENT/u);
+  assert.equal(harness.state.statusMessage, status);
+
+  const panelText = collectTextNodes(
+    PlanApprovalPanelView({ state: harness.state }),
+  )
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Could not open editor:.*ENOENT/u);
+
+  harness.press("j");
+  assert.equal(harness.state.statusMessage, undefined);
+});
+
+test("Ctrl+G missing editor shows locale hint in panel", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  let status = "";
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({
+        kind: "not_found",
+        message: "spawnSync vi ENOENT",
+        status: "error",
+      }),
+      locale: "zh-CN",
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  assert.equal(status, "未找到编辑器：请设置 $VISUAL 或 $EDITOR");
+  assert.equal(harness.state.statusMessage, status);
+});
+
+test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
+  const missing = editPlanInExternalEditor({
+    env: {},
+    plan: SAMPLE_PLAN,
+    spawnSyncFn: () => {
+      const error = new Error("spawnSync vi ENOENT") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      return { error, status: null, signal: null };
+    },
+  });
+  assert.equal(missing.status, "error");
+  if (missing.status === "error") {
+    assert.equal(missing.kind, "not_found");
+  }
+
+  const failedExit = editPlanInExternalEditor({
+    env: { EDITOR: "vim" },
+    plan: SAMPLE_PLAN,
+    spawnSyncFn: () => ({ error: undefined, status: 2, signal: null }),
+  });
+  assert.equal(failedExit.status, "error");
+  if (failedExit.status === "error") {
+    assert.match(failedExit.message, /exited with status 2/u);
+    assert.equal(failedExit.kind, undefined);
+  }
 });
 
 function createHarness(plan: string): {

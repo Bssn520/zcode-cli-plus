@@ -1,6 +1,7 @@
 import type { PermissionBrokerResult, SupportedLocale } from "@zcode/contracts";
 import type { KeyEvent } from "@mbears/opentui-core";
 import type React from "react";
+import { getZCodeCopy } from "@zcode/i18n";
 import { clampIndex, printableKey } from "./app-input.js";
 import type { ApprovalPrompt, PlanApprovalComment, PlanApprovalState } from "./app-model.js";
 import {
@@ -155,8 +156,23 @@ export function handlePlanApprovalKey(
       );
       return;
     }
-    setStatus(`Could not open editor: ${result.message}`);
+    const planCopy = getZCodeCopy(options?.locale ?? "en-US").tui.planApproval;
+    const message =
+      result.kind === "not_found"
+        ? planCopy.editorNotFound
+        : planCopy.editorFailed(result.message);
+    update((draft) => {
+      draft.statusMessage = message;
+    });
+    setStatus(message);
     return;
+  }
+
+  // Ephemeral editor hint: dismiss on the next key after Ctrl+G failure.
+  if (state.statusMessage) {
+    update((draft) => {
+      draft.statusMessage = undefined;
+    });
   }
 
   const character = printableKey(key)?.toLowerCase();
