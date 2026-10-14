@@ -39,7 +39,10 @@ export function ApprovalPanel({
   contentWidth?: number;
 }): React.ReactElement {
   if (approval.planApprovalState) {
-    return h(PlanApprovalPanel, { state: approval.planApprovalState });
+    return h(PlanApprovalPanel, {
+      contentWidth,
+      state: approval.planApprovalState,
+    });
   }
 
   if (approval.questionState) {

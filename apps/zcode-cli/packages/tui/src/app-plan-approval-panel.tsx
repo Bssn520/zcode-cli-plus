@@ -3,6 +3,7 @@ import type { PlanApprovalState } from "./app-model.js";
 import { palette } from "./app-model.js";
 import { MarkdownText } from "./app-markdown.js";
 import { isPlanDraftModified } from "./app-plan-approval-state.js";
+import { wrapPlanApprovalHints } from "./app-plan-approval-hints.js";
 import { parsePlanPreview } from "./app-plan-parse.js";
 import type { TuiCopy } from "@zcode/i18n";
 import { DEFAULT_TUI_COPY } from "./app-locale.js";
@@ -13,11 +14,16 @@ const h = React.createElement as (
   ...children: React.ReactNode[]
 ) => React.ReactElement;
 
+const PLAN_APPROVAL_FALLBACK_CONTENT_WIDTH = 80;
+const PLAN_APPROVAL_MIN_CONTENT_WIDTH = 8;
+
 export function PlanApprovalPanel({
   copy = DEFAULT_TUI_COPY,
+  contentWidth,
   state,
 }: {
   copy?: TuiCopy;
+  contentWidth?: number;
   state: PlanApprovalState;
 }): React.ReactElement {
   const text = copy.planApproval;
@@ -107,8 +113,11 @@ export function PlanApprovalPanel({
   if (footerBits.length > 0) {
     rows.push(h("text", { key: "meta", style: { fg: palette.muted } }, footerBits.join(" · ")));
   }
-  rows.push(h("text", { key: "help", style: { fg: palette.muted } }, text.help));
-
+  const rowContentWidth = normalizePlanApprovalContentWidth(contentWidth);
+  const helpLines = wrapPlanApprovalHints(text.help, rowContentWidth);
+  for (const [index, line] of helpLines.entries()) {
+    rows.push(h("text", { key: `help-${index}`, style: { fg: palette.muted } }, line));
+  }
   return h("box", { title: text.title, style: panelStyle() }, ...rows);
 }
 
@@ -124,6 +133,13 @@ function formatComment(
     });
   }
   return text.overallCommentSummary(comment.text);
+}
+
+function normalizePlanApprovalContentWidth(contentWidth: number | undefined): number {
+  if (contentWidth === undefined || !Number.isFinite(contentWidth)) {
+    return PLAN_APPROVAL_FALLBACK_CONTENT_WIDTH;
+  }
+  return Math.max(PLAN_APPROVAL_MIN_CONTENT_WIDTH, Math.floor(contentWidth));
 }
 
 function panelStyle(): Record<string, unknown> {
