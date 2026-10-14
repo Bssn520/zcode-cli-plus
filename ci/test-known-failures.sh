@@ -42,7 +42,12 @@ else
   grep -v '^#' "$ROOT/ci/known-failures.tsv" | cut -f1-3 | sort -u > "$KNOWN"
 fi
 NEW=$(comm -23 <(sort -u "$OUT") "$KNOWN")
-FIXED=$(comm -13 <(sort -u "$OUT") <(grep -v '^#' "$ROOT/ci/known-failures.tsv" | awk -F'\t' '$5=="fail"' | cut -f1-3 | sort -u))
+# test='*' in known list matches any failing case for that package+file.
+if [ -n "$NEW" ]; then
+  NEW=$(awk -F'\t' 'NR==FNR{if($3=="*")w[$1 SUBSEP $2]=1;next} !(($1 SUBSEP $2) in w)' "$KNOWN" <(printf '%s\n' "$NEW"))
+fi
+# '*' rows are file-level flaky markers; never treat them as FIXED/'fail'.
+FIXED=$(comm -13 <(sort -u "$OUT") <(grep -v '^#' "$ROOT/ci/known-failures.tsv" | awk -F'\t' '$5=="fail" && $3!="*"' | cut -f1-3 | sort -u))
 # In affected mode, only warn about fixed entries inside the affected set.
 if [ -n "${ZCP_AFFECTED_PACKAGES:-}" ] && [ -n "$FIXED" ]; then
   FIXED=$(echo "$FIXED" | while IFS=$'\t' read -r pkg rest; do

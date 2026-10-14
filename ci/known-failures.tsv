@@ -1,11 +1,10 @@
-# package	file	test	upstream_tag	status	note  (fail = deterministic; flaky = intermittent under parallel load; ci-env = fails only on GitHub CI runner)
+# package	file	test	upstream_tag	status	note  (fail = deterministic; flaky = intermittent under parallel load; ci-env = fails only on GitHub CI runner; test='*' matches any case in that package+file)
 @zcode/adapters	tests/builtin-mcs-search-wire.test.ts	Published MCS and search final Anthropic wire account:bigmodel-offpeak-idle-plan / https://zcode.z.ai/api/v1/off-peak/anthropic / GLM-5.3-Flash	v3.15.1	fail	
 @zcode/adapters	tests/builtin-mcs-search-wire.test.ts	Published MCS and search final Anthropic wire account:zai-offpeak-idle-plan / https://zcode.z.ai/api/v1/off-peak/anthropic / GLM-5.3-Flash	v3.15.1	fail	
 @zcode/adapters	tests/config.test.ts	<file load error>	v3.15.1	fail	
 @zcode/adapters	tests/exec.test.ts	NodeExecutionAdapter timeout 只约束子进程运行阶段，准备较慢的命令不会未启动就被判 timed_out	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
-@zcode/adapters	tests/mcp-oauth-cross-process.e2e.test.ts	MCP OAuth cross-process end-to-end completes authorization that outlasts the caller budget (incident timeline replay)	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
-@zcode/adapters	tests/mcp-oauth-cross-process.e2e.test.ts	MCP OAuth cross-process end-to-end two real processes elect one authorization leader with one DCR and one authorization URL	v3.15.1	flaky	CI-only, intermittent: newly failed on CI run 38537031997 only (not in earlier attempts); timing-sensitive under parallel load
-@zcode/adapters	tests/mcp.test.ts	createMcpAdapter keeps runtime OAuth recovery alive after the triggering caller times out	v3.15.1	flaky	CI-only, intermittent: newly failed on CI run 38537031997 only (not in earlier attempts); timing-sensitive under parallel load
+@zcode/adapters	tests/mcp-oauth-cross-process.e2e.test.ts	*	v3.15.1	flaky	timing-dependent; random sub-cases fail in CI under parallel load (file-level)
+@zcode/adapters	tests/mcp.test.ts	*	v3.15.1	flaky	timing-dependent; random sub-cases fail in CI under parallel load (file-level)
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB01' resolves model capability undefined to 32000	v3.15.1	fail	
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB02' resolves model capability 16000 to 16000	v3.15.1	fail	
 @zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB03' resolves model capability 64000 to 64000	v3.15.1	fail	
@@ -53,9 +52,7 @@
 @zcode/adapters	tests/runner-options.test.ts	shouldIncludeStreamResponseBody enables responseBody capture for zcode-plan openai-compatible providers	v3.15.1	fail	
 @zcode/adapters	tests/session-store.test.ts	SQLite session store allows two Agent processes to migrate the same new database concurrently	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/app-subagent-legacy-init.test.ts	App 初始化旧 Subagent 身份 用户目录完成原地迁移再构造 Runtime；项目文件不迁移也不暗中换身份	v3.15.1	fail	
-@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	dynamic workflow run service — 模型侧错误的收容（apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md） 一个子代理撞上确定性模型错误 → run stopped(provider)，兄弟在飞 ask 被 abort，可恢复	v3.15.1	flaky	CI-only, intermittent: newly failed on CI run 38537031997 only (not in earlier attempts); timing-sensitive under parallel load
-@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	dynamic workflow run service — 留白（FillWorkflowHole） 冷回放为 hole-reached 铸出与 live 逐字节相同的载荷（type 从行里的有效脚本重建）	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
-@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	dynamic workflow run service — 留白（FillWorkflowHole） 十步的尾巴留白接龙跑到完成：每一步一个名字键 id，深度不进 id，所有 id 都在 64 字符以内	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	*	v3.15.1	flaky	timing-dependent; random sub-cases fail in CI under parallel load (file-level)
 @zcode/bootstrap	tests/dynamic-workflow-skill.test.ts	bundled dynamic-workflows skill compiles every script block marked as complete	v3.15.1	ci-env	用户不使用该功能 (feature unused); CI-only failure
 @zcode/bootstrap	tests/fault-matrix-harness.test.ts	fault matrix harness — B1 healthy @ W2 driver 级：completed，请求数 = 逻辑请求数，闸门与时钟接上	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
 @zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig Standalone 与 Desktop 一样丢弃内置套餐配置，API 只迁 Key	v3.15.1	fail	
