@@ -1,4 +1,5 @@
 import React from "react";
+import { useTerminalDimensions } from "@mbears/opentui-react";
 import type { PlanApprovalState } from "./app-model.js";
 import { palette } from "./app-model.js";
 import { MarkdownText } from "./app-markdown.js";
@@ -16,14 +17,56 @@ const h = React.createElement as (
 
 const PLAN_APPROVAL_FALLBACK_CONTENT_WIDTH = 80;
 const PLAN_APPROVAL_MIN_CONTENT_WIDTH = 8;
+// border(2) + padding(2); matches APPROVAL_PANEL_CHROME_ROWS
+const PLAN_APPROVAL_PANEL_CHROME_ROWS = 4;
+// ContentPane minHeight(8) + panel/transcript marginBottom(1+1)
+const PLAN_APPROVAL_VERTICAL_RESERVE = 10;
+const PLAN_APPROVAL_MIN_PANEL_HEIGHT = 12;
+const PLAN_APPROVAL_MIN_PREVIEW_HEIGHT = 1;
+const PLAN_APPROVAL_FALLBACK_MAX_HEIGHT = 40;
+
+// 原因：高度受限的 column 里裸 text 会被 yoga 压成 0 高叠画；按 sidebar 方式钉死行高。
+const PLAN_TEXT_ROW_STYLE = {
+  flexShrink: 0,
+  height: 1,
+  truncate: true,
+  width: "100%",
+  wrapMode: "none",
+} as const;
 
 export function PlanApprovalPanel({
   copy = DEFAULT_TUI_COPY,
   contentWidth,
+  maxHeight,
   state,
 }: {
   copy?: TuiCopy;
   contentWidth?: number;
+  maxHeight?: number;
+  state: PlanApprovalState;
+}): React.ReactElement {
+  const { height: terminalHeight } = useTerminalDimensions();
+  const resolvedMaxHeight =
+    maxHeight ??
+    Math.max(PLAN_APPROVAL_MIN_PANEL_HEIGHT, Math.floor(terminalHeight) - PLAN_APPROVAL_VERTICAL_RESERVE);
+  return PlanApprovalPanelView({
+    copy,
+    contentWidth,
+    maxHeight: resolvedMaxHeight,
+    state,
+  });
+}
+
+/** Hook-free render path for unit tests that call the panel as a plain function. */
+export function PlanApprovalPanelView({
+  copy = DEFAULT_TUI_COPY,
+  contentWidth,
+  maxHeight = PLAN_APPROVAL_FALLBACK_MAX_HEIGHT,
+  state,
+}: {
+  copy?: TuiCopy;
+  contentWidth?: number;
+  maxHeight?: number;
   state: PlanApprovalState;
 }): React.ReactElement {
   const text = copy.planApproval;
@@ -32,93 +75,128 @@ export function PlanApprovalPanel({
       state.commentTarget?.kind === "step"
         ? text.commentStepTitle(state.commentTarget.stepIndex + 1)
         : text.commentOverallTitle;
+    const rows = [
+      textRow("buffer", `> ${state.commentBuffer}`, palette.accent),
+      textRow("help", text.commentHelp, palette.muted),
+    ];
     return h(
       "box",
-      { title: targetLabel, style: panelStyle() },
-      h("text", { style: { fg: palette.accent } }, `> ${state.commentBuffer}`),
-      h("text", { style: { fg: palette.muted } }, text.commentHelp),
+      {
+        title: targetLabel,
+        style: panelStyle(PLAN_APPROVAL_PANEL_CHROME_ROWS + rows.length),
+      },
+      ...rows,
     );
   }
 
   if (state.mode === "review") {
-    return h(
-      "box",
-      { title: text.reviewTitle, style: panelStyle() },
+    const rows = [
       ...state.comments.map((comment, index) =>
-        h(
-          "text",
-          {
-            key: comment.id,
-            style: {
-              fg: index === state.selectedCommentIndex ? palette.accent : palette.text,
-            },
-          },
+        textRow(
+          comment.id,
           `${index === state.selectedCommentIndex ? ">" : " "} ${formatComment(comment, text)}`,
+          index === state.selectedCommentIndex ? palette.accent : palette.text,
         ),
       ),
-      h("text", { style: { fg: palette.muted } }, text.reviewHelp),
+      textRow("help", text.reviewHelp, palette.muted),
+    ];
+    return h(
+      "box",
+      {
+        title: text.reviewTitle,
+        style: panelStyle(PLAN_APPROVAL_PANEL_CHROME_ROWS + rows.length),
+      },
+      ...rows,
     );
   }
 
   const parsed = parsePlanPreview(state.draftPlan);
   const edited = isPlanDraftModified(state);
-  const rows: React.ReactElement[] = [
-    h("text", { key: "prompt", style: { fg: palette.warning } }, text.prompt),
+  const headerRows: React.ReactElement[] = [
+    textRow("prompt", text.prompt, palette.warning),
   ];
 
   if (parsed.splittable) {
     if (parsed.steps.length > 0) {
-      rows.push(h("text", { key: "steps-h", style: { fg: palette.muted } }, text.stepsHeading));
+      headerRows.push(textRow("steps-h", text.stepsHeading, palette.muted));
       for (const [index, step] of parsed.steps.entries()) {
         const selected = index === state.selectedStepIndex;
         const note = state.comments.find(
           (comment) => comment.kind === "step" && comment.stepIndex === index,
         );
-        rows.push(
-          h(
-            "text",
-            {
-              key: `step-${index}`,
-              style: { fg: selected ? palette.accent : palette.text },
-            },
+        headerRows.push(
+          textRow(
+            `step-${index}`,
             `${selected ? ">" : " "} ${index + 1}. ${step}${note ? `  [${text.noteMarker}]` : ""}`,
+            selected ? palette.accent : palette.text,
           ),
         );
       }
     }
     if (parsed.files.length > 0) {
-      rows.push(h("text", { key: "files-h", style: { fg: palette.muted } }, text.filesHeading));
+      headerRows.push(textRow("files-h", text.filesHeading, palette.muted));
       for (const [index, file] of parsed.files.entries()) {
-        rows.push(h("text", { key: `file-${index}`, style: { fg: palette.text } }, `  • ${file}`));
+        headerRows.push(textRow(`file-${index}`, `  • ${file}`, palette.text));
       }
     }
     if (parsed.risks.length > 0) {
-      rows.push(h("text", { key: "risks-h", style: { fg: palette.muted } }, text.risksHeading));
+      headerRows.push(textRow("risks-h", text.risksHeading, palette.muted));
       for (const [index, risk] of parsed.risks.entries()) {
-        rows.push(
-          h("text", { key: `risk-${index}`, style: { fg: palette.warning } }, `  ! ${risk}`),
-        );
+        headerRows.push(textRow(`risk-${index}`, `  ! ${risk}`, palette.warning));
       }
     }
   }
 
-  rows.push(h("text", { key: "preview-h", style: { fg: palette.muted } }, text.previewHeading));
-  rows.push(h(MarkdownText, { key: "preview", content: state.draftPlan }));
+  headerRows.push(textRow("preview-h", text.previewHeading, palette.muted));
 
+  const footerRows: React.ReactElement[] = [];
   const footerBits = [
     edited ? text.editedBadge : undefined,
     parsed.steps.length > 0 ? text.stepCount(parsed.steps.length) : undefined,
     state.comments.length > 0 ? text.commentCount(state.comments.length) : undefined,
   ].filter(Boolean);
   if (footerBits.length > 0) {
-    rows.push(h("text", { key: "meta", style: { fg: palette.muted } }, footerBits.join(" · ")));
+    footerRows.push(textRow("meta", footerBits.join(" · "), palette.muted));
   }
   const rowContentWidth = normalizePlanApprovalContentWidth(contentWidth);
   const helpLines = wrapPlanApprovalHints(text.help, rowContentWidth);
   for (const [index, line] of helpLines.entries()) {
-    rows.push(h("text", { key: `help-${index}`, style: { fg: palette.muted } }, line));
+    footerRows.push(textRow(`help-${index}`, line, palette.muted));
   }
-  return h("box", { title: text.title, style: panelStyle() }, ...rows);
+
+  const fixedRows = headerRows.length + footerRows.length;
+  const naturalPreviewHeight = Math.max(
+    PLAN_APPROVAL_MIN_PREVIEW_HEIGHT,
+    state.draftPlan.split(/\r?\n/u).length,
+  );
+  const previewHeight = planApprovalPreviewHeight(fixedRows, naturalPreviewHeight, maxHeight);
+  const panelHeight = PLAN_APPROVAL_PANEL_CHROME_ROWS + fixedRows + previewHeight;
+
+  return h(
+    "box",
+    { title: text.title, style: panelStyle(panelHeight) },
+    ...headerRows,
+    h(
+      "scrollbox",
+      {
+        key: "preview",
+        scrollX: false,
+        style: {
+          flexGrow: 0,
+          flexShrink: 0,
+          height: previewHeight,
+          minHeight: PLAN_APPROVAL_MIN_PREVIEW_HEIGHT,
+          contentOptions: { flexDirection: "column" },
+        },
+      },
+      h(MarkdownText, { content: state.draftPlan }),
+    ),
+    ...footerRows,
+  );
+}
+
+function textRow(key: string, body: string, fg: string): React.ReactElement {
+  return h("text", { key, style: { ...PLAN_TEXT_ROW_STYLE, fg } }, body);
 }
 
 function formatComment(
@@ -142,12 +220,31 @@ function normalizePlanApprovalContentWidth(contentWidth: number | undefined): nu
   return Math.max(PLAN_APPROVAL_MIN_CONTENT_WIDTH, Math.floor(contentWidth));
 }
 
-function panelStyle(): Record<string, unknown> {
+function planApprovalPreviewHeight(
+  fixedRows: number,
+  naturalPreviewHeight: number,
+  maxHeight: number,
+): number {
+  const remaining =
+    Math.floor(maxHeight) - PLAN_APPROVAL_PANEL_CHROME_ROWS - fixedRows;
+  // 固定行不够放时宁可顶到 transcript，也不压缩 header/footer。
+  if (remaining < PLAN_APPROVAL_MIN_PREVIEW_HEIGHT) {
+    return PLAN_APPROVAL_MIN_PREVIEW_HEIGHT;
+  }
+  return Math.max(
+    PLAN_APPROVAL_MIN_PREVIEW_HEIGHT,
+    Math.min(naturalPreviewHeight, remaining),
+  );
+}
+
+function panelStyle(height: number): Record<string, unknown> {
   return {
     backgroundColor: palette.panel,
     border: true,
     borderColor: palette.warning,
     flexDirection: "column",
+    flexShrink: 0,
+    height,
     marginBottom: 1,
     padding: 1,
     width: "100%",

@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { KeyEvent } from "@mbears/opentui-core";
 import type { PermissionBrokerRequest, PermissionBrokerResult } from "@zcode/contracts";
-import { PlanApprovalPanel } from "../src/app-plan-approval-panel.js";
+import { PlanApprovalPanel, PlanApprovalPanelView } from "../src/app-plan-approval-panel.js";
 import { wrapPlanApprovalHints } from "../src/app-plan-approval-hints.js";
 import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
+import { testRender } from "@mbears/opentui-react/test-utils";
+import React, { act } from "react";
 import type { ApprovalPrompt } from "../src/app-model.js";
 import {
   composePlanFeedbackReason,
@@ -175,7 +177,7 @@ test("key map has Ctrl+G edit and no e/F bindings", () => {
 
 test("unsplittable plan still renders preview without section error", () => {
   const plan = "Plain prose plan without structured sections.";
-  const lines = collectTextNodes(PlanApprovalPanel({ state: createPlanApprovalState(plan) }));
+  const lines = collectTextNodes(PlanApprovalPanelView({ state: createPlanApprovalState(plan) }));
   const text = lines.map((line) => line.text).join("\n");
   assert.match(text, /Exit plan mode|退出计划模式/u);
   assert.match(text, /Plain prose plan/u);
@@ -228,14 +230,112 @@ test("plan approval help wraps at hint boundaries on narrow widths", () => {
     }
 
     const panelHelpLines = collectTextNodes(
-      PlanApprovalPanel({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
+      PlanApprovalPanelView({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
     )
       .map((line) => line.text)
       .filter((text) => hints.some((hint) => text === hint || text.includes(`${hint} · `) || text.includes(` · ${hint}`)));
+    assert.ok(
+      collectTextNodes(
+        PlanApprovalPanelView({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
+      )
+        .filter((node) => Object.keys(node.style).length > 0)
+        .every((node) => node.style.flexShrink === 0 && node.style.height === 1),
+      `text rows must pin height/flexShrink at width ${width}`,
+    );
     assert.deepEqual(panelHelpLines, lines);
   }
 
   assert.deepEqual(wrapPlanApprovalHints(help, 120), [help]);
+});
+
+test("plan approval panel stacks rows without overlap in opentui renderer", async () => {
+  const help = DEFAULT_TUI_COPY.planApproval.help;
+  const cases = [
+    { width: 120, height: 40, contentWidth: 100 },
+    { width: 50, height: 40, contentWidth: 46 },
+  ] as const;
+
+  for (const viewport of cases) {
+    let view: Awaited<ReturnType<typeof testRender>> | undefined;
+    await act(async () => {
+      view = await testRender(
+        React.createElement(
+          "box",
+          { style: { flexDirection: "column", height: viewport.height, width: viewport.width } },
+          React.createElement(PlanApprovalPanel, {
+            contentWidth: viewport.contentWidth,
+            maxHeight: viewport.height - 10,
+            state: createPlanApprovalState(SAMPLE_PLAN),
+          }),
+        ),
+        {
+          height: viewport.height,
+          kittyKeyboard: true,
+          otherModifiersMode: true,
+          width: viewport.width,
+        },
+      );
+      await view.flush();
+    });
+
+    try {
+      assert.ok(view);
+      const lines = view
+        .captureCharFrame()
+        .split("\n")
+        .map((line) => line.trimEnd());
+      const nonEmpty = lines.filter((line) => line.trim().length > 0);
+      const label = `${viewport.width}x${viewport.height}`;
+
+      const promptIdx = nonEmpty.findIndex((line) => line.includes("Exit plan mode"));
+      const stepsIdx = nonEmpty.findIndex((line) => line.includes("Steps"));
+      const stepRowIdx = nonEmpty.findIndex(
+        (line) => line.includes("1.") && line.includes("Update service boundary"),
+      );
+      const fileIdx = nonEmpty.findIndex((line) => line.includes("app-permission.ts"));
+      const previewIdx = nonEmpty.findIndex((line) => line.includes("Preview"));
+      assert.ok(promptIdx >= 0, `missing prompt at ${label}`);
+      assert.ok(stepsIdx > promptIdx, `Steps not below prompt at ${label}`);
+      assert.ok(stepRowIdx > stepsIdx, `step row not below Steps at ${label}`);
+      assert.ok(fileIdx > stepRowIdx, `file row not below steps at ${label}`);
+      assert.ok(previewIdx > fileIdx, `Preview not below files at ${label}`);
+
+      // Overlap symptom from real terminals: labels collapsed onto one painted row.
+      assert.equal(
+        nonEmpty.some(
+          (line) =>
+            line.includes("Preview") &&
+            (line.includes("Steps") || line.includes("Exit plan mode") || line.includes("•")),
+        ),
+        false,
+        `collapsed header row at ${label}`,
+      );
+
+      const helpLines = wrapPlanApprovalHints(help, viewport.contentWidth);
+      const helpRowIndexes = helpLines.map((helpLine) =>
+        nonEmpty.findIndex((line) => line.includes(helpLine)),
+      );
+      assert.ok(
+        helpRowIndexes.every((index) => index >= 0),
+        `missing wrapped help at ${label}: ${JSON.stringify(nonEmpty.slice(-6))}`,
+      );
+      assert.equal(
+        new Set(helpRowIndexes).size,
+        helpLines.length,
+        `help lines share a painted row at ${label}: ${JSON.stringify(helpRowIndexes)}`,
+      );
+
+      const bottomBorderIdx = lines.findIndex((line) => line.includes("└"));
+      assert.ok(
+        bottomBorderIdx >= 0 && bottomBorderIdx < viewport.height,
+        `panel bottom overflows viewport at ${label} (border=${bottomBorderIdx})`,
+      );
+    } finally {
+      await act(async () => {
+        view?.renderer.destroy();
+      });
+    }
+  }
 });
 
 test("splitEditorCommand keeps editor args", () => {
