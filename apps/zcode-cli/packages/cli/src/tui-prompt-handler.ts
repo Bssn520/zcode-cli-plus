@@ -13,6 +13,7 @@ import { createCliHeadlessBrowserRuntime } from "./headless-browser.js";
 // 两处各写一份「怎么把它读出来」就会在方法改名时只修好一处。
 import { readRuntimeEventSubscriber } from "./runtime-event-subscriber.js";
 import { createTuiSessionEventRelay } from "./tui-session-event-relay.js";
+import { applyForkModelCarryOver, readForkModelCarryOver } from "./tui-fork-model.js";
 import { attachTuiAppQueries, readTuiSessionMetadata } from "./tui-prompt-handler-queries.js";
 import {
   createTuiProcessRuntimeState,
@@ -245,17 +246,19 @@ export function createTuiSubmitPrompt(
   const commandCenter = createCommandCenter({
     forkApp: async (options) => {
       const activeApp = await getApp();
+      const modelCarryOver = readForkModelCarryOver(activeApp);
       const result = await activeApp.forkFromCheckpoint?.(options);
       if (!result) {
         throw new Error("Forking is not available in this client.");
       }
-      await replaceApp(
+      const forkedApp = await replaceApp(
         async () =>
           await createApp({
             continueSession: false,
             resumeSessionId: result.forkedSessionId,
           }),
       );
+      await applyForkModelCarryOver(forkedApp, modelCarryOver);
       return {
         copiedMessageCount: result.copiedMessageCount,
         forkedSessionId: result.forkedSessionId,
