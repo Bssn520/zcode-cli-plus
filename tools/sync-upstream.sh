@@ -50,6 +50,9 @@ done
 while read -r f; do [ -f "$f" ] && cp "$f" "$DST/$f"; done < /tmp/zsync.$$
 rm -f /tmp/zsync*.$$
 
+# Fork-owned .gitignore additions.
+printf '\n# 发布包组装目录\n.npm-package/\n' >> "$DST/.gitignore"
+
 # Our CI test gate (not upstream): known upstream failures for this tag + runner.
 mkdir -p "$DST/ci"
 cp "$TOOLS/collect-failures.sh" "$TOOLS/test-known-failures.sh" "$DST/ci/"
@@ -69,7 +72,10 @@ const devDependencies={};for(const k of keepDev) if(pkg.devDependencies[k]) devD
 const pd={};for(const [k,v] of Object.entries(pkg.pnpm.patchedDependencies)) if(patches.includes(path.basename(v))) pd[k]=v;
 const out={name:'zcode-cli-plus-workspace',version:pkg.version,private:true,type:'module',
  scripts:{build:'pnpm --dir apps/zcode-cli build','cli:build':'pnpm --dir apps/zcode-cli cli:build',
-  test:'pnpm --dir apps/zcode-cli test','test:ci':'bash ci/test-known-failures.sh',typecheck:'pnpm --dir apps/zcode-cli typecheck',lint:'pnpm --dir apps/zcode-cli lint',
+  test:'pnpm --dir apps/zcode-cli test','test:ci':'bash ci/test-known-failures.sh',typecheck:'pnpm --dir apps/zcode-cli typecheck',// lint mirrors upstream exactly: root `oxlint` with root .oxlintrc.json (whose ignorePatterns skip
+  // apps/zcode-cli except packages with their own nested config). Upstream never runs per-package
+  // `turbo run lint` with the root max-lines rule; several upstream CLI files exceed it.
+  lint:pkg.scripts.lint,'ci:local':'bash ci/run-ci-local.sh',
   'build:sea':pkg.scripts['build:sea'],'build:sea:all':pkg.scripts['build:sea:all'],'release:cli':pkg.scripts['release:cli'],'release:cli:dry':pkg.scripts['release:cli:dry']},
  devDependencies,engines:pkg.engines,packageManager:pkg.packageManager,
  pnpm:{overrides:pkg.pnpm.overrides,patchedDependencies:pd},license:pkg.license};
@@ -85,4 +91,8 @@ COMMIT=$(git -C "$SRC" rev-parse HEAD 2>/dev/null || echo unknown)
 printf 'tag=%s\ncommit=%s\nsource=https://github.com/zai-org/ZCode\n' "$TAG" "$COMMIT" > "$DST/UPSTREAM_TAG"
 # Prune upstream lockfile to the CLI-only workspace (keeps upstream-resolved versions). Skip with NO_LOCK=1.
 if [ "${NO_LOCK:-0}" != 1 ]; then (cd "$DST" && pnpm install --lockfile-only --ignore-scripts >/dev/null); fi
+# turbo treats apps/zcode-cli as its repo root and reads the (stale upstream) nested lockfile;
+# derive it from the root lockfile so every CLI workspace package is present (no turbo warnings).
+node "$TOOLS/derive-cli-lockfile.mjs" "$DST/pnpm-lock.yaml" "$DST/apps/zcode-cli/pnpm-lock.yaml"
+cp "$TOOLS/run-ci-local.sh" "$DST/ci/"
 echo "synced $TAG -> $DST"

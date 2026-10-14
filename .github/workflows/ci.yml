@@ -38,12 +38,11 @@ jobs:
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
-      - name: Lint
-        working-directory: apps/zcode-cli
-        run: ../../node_modules/.bin/turbo run lint
+      - name: Lint (root oxlint, same as upstream `pnpm lint`)
+        run: pnpm lint
       - name: Typecheck
         working-directory: apps/zcode-cli
-        run: ../../node_modules/.bin/turbo run typecheck
+        run: ../../node_modules/.bin/turbo run typecheck --force
       - name: Build
         run: pnpm --filter zcode-cli build
       - name: Smoke
