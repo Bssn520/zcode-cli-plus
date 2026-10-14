@@ -107,7 +107,7 @@ export function handlePlanApprovalKey(
     return;
   }
   if (state.mode === "review") {
-    handleReviewKey(key, approval, state, update, setApprovalQueue, setStatus);
+    handleReviewKey(key, approval, state, update, setApprovalQueue, setStatus, options?.locale);
     return;
   }
 
@@ -123,7 +123,7 @@ export function handlePlanApprovalKey(
   if (key.name === "return") {
     // 有评论时 Enter 应发送反馈，不能静默批准丢掉评论文本。
     if (state.comments.length > 0) {
-      sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus);
+      sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus, options?.locale);
       return;
     }
     resolvePlanApproval(
@@ -340,6 +340,7 @@ function handleReviewKey(
   update: (recipe: (draft: PlanApprovalState) => void) => void,
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
   setStatus: (status: string) => void,
+  locale?: SupportedLocale,
 ): void {
   if (key.name === "escape") {
     update((draft) => {
@@ -354,7 +355,7 @@ function handleReviewKey(
       setStatus("No comments to send.");
       return;
     }
-    sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus);
+    sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus, locale);
     return;
   }
 
@@ -395,11 +396,20 @@ function sendPlanApprovalFeedback(
   state: PlanApprovalState,
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
   setStatus: (status: string) => void,
+  locale?: SupportedLocale,
 ): void {
+  let reason = composePlanFeedbackReason(state.comments);
+  // 反馈走 deny，编辑后的计划不会进 modifiedInput；有改动时塞进 reason，避免丢失。
+  if (isPlanDraftModified(state)) {
+    const appendix = getZCodeCopy(locale ?? "en-US").tui.planApproval.feedbackModifiedPlan(
+      state.draftPlan,
+    );
+    reason = `${reason}\n\n${appendix}`;
+  }
   resolvePlanApproval(approval, setApprovalQueue, setStatus, {
     decision: "deny",
     preserveReasonFormatting: true,
-    reason: composePlanFeedbackReason(state.comments),
+    reason,
     reasonSource: "plan_approval_feedback",
     resolvedAt: new Date(),
   });

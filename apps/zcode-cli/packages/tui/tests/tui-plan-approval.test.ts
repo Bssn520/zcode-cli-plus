@@ -151,6 +151,56 @@ test("Enter with comments sends plan_approval_feedback without opening review", 
   assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
 });
 
+test("Enter with comments and edited plan appends updated plan to feedback reason", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const edited = `${SAMPLE_PLAN}\nEdited in VISUAL.\n`;
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ plan: edited, status: "updated" }),
+    },
+  );
+  harness.press("g");
+  for (const ch of "shrink scope") harness.press(ch);
+  harness.press("return");
+  harness.press("return", {}, { locale: "en-US" });
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
+  assert.match(
+    harness.result?.reason ?? "",
+    /User modified the plan\. The updated plan is as follows:\n[\s\S]*Edited in VISUAL\./u,
+  );
+  assert.equal(harness.result?.modifiedInput, undefined);
+});
+
+test("review feedback with edited plan appends zh-CN updated plan text", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const edited = `${SAMPLE_PLAN}\n改过的计划\n`;
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ plan: edited, status: "updated" }),
+    },
+  );
+  harness.press("g");
+  for (const ch of "shrink scope") harness.press(ch);
+  harness.press("return");
+  harness.press("r");
+  harness.press("return", {}, { locale: "zh-CN" });
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
+  assert.match(
+    harness.result?.reason ?? "",
+    /用户已修改计划，修改后的计划如下：\n[\s\S]*改过的计划/u,
+  );
+});
+
 test("Enter without comments still approves", () => {
   const harness = createHarness(SAMPLE_PLAN);
   harness.press("return");

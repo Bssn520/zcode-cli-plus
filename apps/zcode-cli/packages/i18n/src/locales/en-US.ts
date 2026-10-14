@@ -388,6 +388,8 @@ Slash Commands:
       overallCommentSummary: (text) => `[general] ${text}`,
       editorNotFound: "No editor found: set $VISUAL or $EDITOR",
       editorFailed: (message) => `Could not open editor: ${message}`,
+      feedbackModifiedPlan: (plan) =>
+        `User modified the plan. The updated plan is as follows:\n${plan}`,
     },
   },
 };

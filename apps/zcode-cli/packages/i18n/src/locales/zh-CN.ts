@@ -385,6 +385,7 @@ Slash Commands:
       overallCommentSummary: (text) => `[整体] ${text}`,
       editorNotFound: "未找到编辑器：请设置 $VISUAL 或 $EDITOR",
       editorFailed: (message) => `无法打开编辑器：${message}`,
+      feedbackModifiedPlan: (plan) => `用户已修改计划，修改后的计划如下：\n${plan}`,
     },
   },
 };

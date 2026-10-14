@@ -326,5 +326,6 @@ export interface TuiCopy {
     overallCommentSummary(text: string): string;
     editorNotFound: string;
     editorFailed(message: string): string;
+    feedbackModifiedPlan(plan: string): string;
   };
 }
