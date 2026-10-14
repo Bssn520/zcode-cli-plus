@@ -25,6 +25,7 @@ export {
   clampIndex,
   filterSelectionItems,
   handleSelectionKey,
+  printableInputText,
   printableKey,
 } from "./app-selection-keyboard.js";
 
