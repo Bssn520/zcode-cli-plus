@@ -21,3 +21,7 @@ packages/**/tests/**/*.d.ts.map
 .VSCodeCounter
 vendor
 !packages/visualize-plugin/skills/visualize/assets/vendor/
+
+# >>> zcode-cli-plus:expected-js
+!packages/**/tests/**/expected/*.js
+# <<< zcode-cli-plus:expected-js
