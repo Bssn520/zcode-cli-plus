@@ -2,18 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { KeyEvent } from "@mbears/opentui-core";
 import type { PermissionBrokerRequest, PermissionBrokerResult } from "@zcode/contracts";
-import { PlanApprovalPanel } from "../src/app-plan-approval-panel.js";
+import { PlanApprovalPanel, PlanApprovalPanelView } from "../src/app-plan-approval-panel.js";
 import { wrapPlanApprovalHints } from "../src/app-plan-approval-hints.js";
 import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
+import { testRender } from "@mbears/opentui-react/test-utils";
+import React, { act } from "react";
 import type { ApprovalPrompt } from "../src/app-model.js";
 import {
+  appendPlanApprovalCommentText,
   composePlanFeedbackReason,
   createPlanApprovalResult,
   createPlanApprovalState,
   handlePlanApprovalKey,
 } from "../src/app-plan-approval-state.js";
 import { parsePlanPreview } from "../src/app-plan-parse.js";
-import { splitEditorCommand } from "../src/app-plan-editor.js";
+import { editPlanInExternalEditor, splitEditorCommand } from "../src/app-plan-editor.js";
+import { createSuspendTerminal } from "../src/suspend-terminal.js";
 import { displayWidth } from "../src/app-terminal-width.js";
 const SAMPLE_PLAN = `## Steps
 1. Update service boundary
@@ -173,9 +177,61 @@ test("key map has Ctrl+G edit and no e/F bindings", () => {
   assert.match(harness.state.draftPlan, /changed/u);
 });
 
+test("comment buffer keeps every char when approval object is stale across key events", () => {
+  let queue: ApprovalPrompt[] = [];
+  const approval: ApprovalPrompt = {
+    cleanup: () => undefined,
+    planApprovalState: createPlanApprovalState(SAMPLE_PLAN),
+    reject: () => undefined,
+    request: fakeRequest(SAMPLE_PLAN),
+    resolve: () => undefined,
+    selectedDecision: "deny",
+  };
+  queue = [approval];
+  const setQueue = (update: React.SetStateAction<ApprovalPrompt[]>) => {
+    queue = typeof update === "function" ? update(queue) : update;
+  };
+
+  handlePlanApprovalKey({ name: "g", sequence: "g" } as KeyEvent, queue[0]!, setQueue, () => undefined);
+  const stale = queue[0];
+  assert.ok(stale);
+
+  for (const name of ["h", "e", "l", "l", "o"]) {
+    handlePlanApprovalKey({ name, sequence: name } as KeyEvent, stale, setQueue, () => undefined);
+  }
+  // Multi-char sequence in one key event (non-bracketed burst / paste-as-key).
+  handlePlanApprovalKey(
+    { name: "", sequence: " world" } as KeyEvent,
+    stale,
+    setQueue,
+    () => undefined,
+  );
+
+  assert.equal(queue[0]?.planApprovalState?.commentBuffer, "hello world");
+});
+
+test("comment buffer accepts bracketed-paste text including newlines as spaces", () => {
+  let queue: ApprovalPrompt[] = [];
+  const prompt: ApprovalPrompt = {
+    cleanup: () => undefined,
+    planApprovalState: createPlanApprovalState(SAMPLE_PLAN),
+    reject: () => undefined,
+    request: fakeRequest(SAMPLE_PLAN),
+    resolve: () => undefined,
+    selectedDecision: "deny",
+  };
+  queue = [prompt];
+  const setQueue = (update: React.SetStateAction<ApprovalPrompt[]>) => {
+    queue = typeof update === "function" ? update(queue) : update;
+  };
+  handlePlanApprovalKey({ name: "g", sequence: "g" } as KeyEvent, queue[0]!, setQueue, () => undefined);
+  const stale = queue[0]!;
+  assert.equal(appendPlanApprovalCommentText("alpha\nbeta\r\ngamma", stale, setQueue), true);
+  assert.equal(queue[0]?.planApprovalState?.commentBuffer, "alpha beta gamma");
+});
 test("unsplittable plan still renders preview without section error", () => {
   const plan = "Plain prose plan without structured sections.";
-  const lines = collectTextNodes(PlanApprovalPanel({ state: createPlanApprovalState(plan) }));
+  const lines = collectTextNodes(PlanApprovalPanelView({ state: createPlanApprovalState(plan) }));
   const text = lines.map((line) => line.text).join("\n");
   assert.match(text, /Exit plan mode|退出计划模式/u);
   assert.match(text, /Plain prose plan/u);
@@ -228,19 +284,222 @@ test("plan approval help wraps at hint boundaries on narrow widths", () => {
     }
 
     const panelHelpLines = collectTextNodes(
-      PlanApprovalPanel({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
+      PlanApprovalPanelView({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
     )
       .map((line) => line.text)
       .filter((text) => hints.some((hint) => text === hint || text.includes(`${hint} · `) || text.includes(` · ${hint}`)));
+    assert.ok(
+      collectTextNodes(
+        PlanApprovalPanelView({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
+      )
+        .filter((node) => Object.keys(node.style).length > 0)
+        .every((node) => node.style.flexShrink === 0 && node.style.height === 1),
+      `text rows must pin height/flexShrink at width ${width}`,
+    );
     assert.deepEqual(panelHelpLines, lines);
   }
 
   assert.deepEqual(wrapPlanApprovalHints(help, 120), [help]);
 });
 
+test("plan approval panel stacks rows without overlap in opentui renderer", async () => {
+  const help = DEFAULT_TUI_COPY.planApproval.help;
+  const cases = [
+    { width: 120, height: 40, contentWidth: 100 },
+    { width: 50, height: 40, contentWidth: 46 },
+  ] as const;
+
+  for (const viewport of cases) {
+    let view: Awaited<ReturnType<typeof testRender>> | undefined;
+    await act(async () => {
+      view = await testRender(
+        React.createElement(
+          "box",
+          { style: { flexDirection: "column", height: viewport.height, width: viewport.width } },
+          React.createElement(PlanApprovalPanel, {
+            contentWidth: viewport.contentWidth,
+            maxHeight: viewport.height - 10,
+            state: createPlanApprovalState(SAMPLE_PLAN),
+          }),
+        ),
+        {
+          height: viewport.height,
+          kittyKeyboard: true,
+          otherModifiersMode: true,
+          width: viewport.width,
+        },
+      );
+      await view.flush();
+    });
+
+    try {
+      assert.ok(view);
+      const lines = view
+        .captureCharFrame()
+        .split("\n")
+        .map((line) => line.trimEnd());
+      const nonEmpty = lines.filter((line) => line.trim().length > 0);
+      const label = `${viewport.width}x${viewport.height}`;
+
+      const promptIdx = nonEmpty.findIndex((line) => line.includes("Exit plan mode"));
+      const stepsIdx = nonEmpty.findIndex((line) => line.includes("Steps"));
+      const stepRowIdx = nonEmpty.findIndex(
+        (line) => line.includes("1.") && line.includes("Update service boundary"),
+      );
+      const fileIdx = nonEmpty.findIndex((line) => line.includes("app-permission.ts"));
+      const previewIdx = nonEmpty.findIndex((line) => line.includes("Preview"));
+      assert.ok(promptIdx >= 0, `missing prompt at ${label}`);
+      assert.ok(stepsIdx > promptIdx, `Steps not below prompt at ${label}`);
+      assert.ok(stepRowIdx > stepsIdx, `step row not below Steps at ${label}`);
+      assert.ok(fileIdx > stepRowIdx, `file row not below steps at ${label}`);
+      assert.ok(previewIdx > fileIdx, `Preview not below files at ${label}`);
+
+      // Overlap symptom from real terminals: labels collapsed onto one painted row.
+      assert.equal(
+        nonEmpty.some(
+          (line) =>
+            line.includes("Preview") &&
+            (line.includes("Steps") || line.includes("Exit plan mode") || line.includes("•")),
+        ),
+        false,
+        `collapsed header row at ${label}`,
+      );
+
+      const helpLines = wrapPlanApprovalHints(help, viewport.contentWidth);
+      const helpRowIndexes = helpLines.map((helpLine) =>
+        nonEmpty.findIndex((line) => line.includes(helpLine)),
+      );
+      assert.ok(
+        helpRowIndexes.every((index) => index >= 0),
+        `missing wrapped help at ${label}: ${JSON.stringify(nonEmpty.slice(-6))}`,
+      );
+      assert.equal(
+        new Set(helpRowIndexes).size,
+        helpLines.length,
+        `help lines share a painted row at ${label}: ${JSON.stringify(helpRowIndexes)}`,
+      );
+
+      const bottomBorderIdx = lines.findIndex((line) => line.includes("└"));
+      assert.ok(
+        bottomBorderIdx >= 0 && bottomBorderIdx < viewport.height,
+        `panel bottom overflows viewport at ${label} (border=${bottomBorderIdx})`,
+      );
+    } finally {
+      await act(async () => {
+        view?.renderer.destroy();
+      });
+    }
+  }
+});
+
 test("splitEditorCommand keeps editor args", () => {
   assert.deepEqual(splitEditorCommand("code --wait"), ["code", "--wait"]);
   assert.deepEqual(splitEditorCommand('"nano -S" ignored'), ["nano -S", "ignored"]);
+});
+
+test("resume reapplies terminal size after external editor", () => {
+  const applied: Array<[number, number]> = [];
+  let resumed = false;
+  let repainted = false;
+  const suspendTerminal = createSuspendTerminal(
+    {
+      processResize(width: number, height: number) {
+        applied.push([width, height]);
+      },
+      requestFullRepaintRender() {
+        repainted = true;
+      },
+      resume() {
+        resumed = true;
+      },
+      suspend() {},
+    } as Parameters<typeof createSuspendTerminal>[0],
+    () => ({ columns: 140, rows: 45 }),
+  );
+
+  suspendTerminal.suspend();
+  suspendTerminal.resume();
+
+  assert.equal(resumed, true);
+  assert.deepEqual(applied, [[140, 45]]);
+  assert.equal(repainted, true);
+});
+
+test("Ctrl+G editor error surfaces in status line and panel", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  let status = "";
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ message: "spawnSync vim ENOENT", status: "error" }),
+      locale: "en-US",
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  assert.match(status, /Could not open editor:.*ENOENT/u);
+  assert.equal(harness.state.statusMessage, status);
+
+  const panelText = collectTextNodes(
+    PlanApprovalPanelView({ state: harness.state }),
+  )
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Could not open editor:.*ENOENT/u);
+
+  harness.press("j");
+  assert.equal(harness.state.statusMessage, undefined);
+});
+
+test("Ctrl+G missing editor shows locale hint in panel", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  let status = "";
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({
+        kind: "not_found",
+        message: "spawnSync vi ENOENT",
+        status: "error",
+      }),
+      locale: "zh-CN",
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  assert.equal(status, "未找到编辑器：请设置 $VISUAL 或 $EDITOR");
+  assert.equal(harness.state.statusMessage, status);
+});
+
+test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
+  const missing = editPlanInExternalEditor({
+    env: {},
+    plan: SAMPLE_PLAN,
+    spawnSyncFn: () => {
+      const error = new Error("spawnSync vi ENOENT") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      return { error, status: null, signal: null };
+    },
+  });
+  assert.equal(missing.status, "error");
+  if (missing.status === "error") {
+    assert.equal(missing.kind, "not_found");
+  }
+
+  const failedExit = editPlanInExternalEditor({
+    env: { EDITOR: "vim" },
+    plan: SAMPLE_PLAN,
+    spawnSyncFn: () => ({ error: undefined, status: 2, signal: null }),
+  });
+  assert.equal(failedExit.status, "error");
+  if (failedExit.status === "error") {
+    assert.match(failedExit.message, /exited with status 2/u);
+    assert.equal(failedExit.kind, undefined);
+  }
 });
 
 function createHarness(plan: string): {
@@ -250,6 +509,7 @@ function createHarness(plan: string): {
     name: string,
     mods?: { ctrl?: boolean; meta?: boolean; shift?: boolean },
     options?: Parameters<typeof handlePlanApprovalKey>[4],
+    setStatus?: (status: string) => void,
   ) => void;
 } {
   let result: PermissionBrokerResult | undefined;
@@ -278,7 +538,7 @@ function createHarness(plan: string): {
       assert.ok(current?.planApprovalState);
       return current.planApprovalState;
     },
-    press(name, mods = {}, options) {
+    press(name, mods = {}, options, setStatus = () => undefined) {
       const current = queue[0];
       assert.ok(current);
       handlePlanApprovalKey(
@@ -291,7 +551,7 @@ function createHarness(plan: string): {
         } as KeyEvent,
         current,
         setQueue,
-        () => undefined,
+        setStatus,
         options,
       );
     },

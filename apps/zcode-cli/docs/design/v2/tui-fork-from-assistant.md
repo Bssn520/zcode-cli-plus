@@ -32,7 +32,12 @@ Always show a composer `TuiSelection` before forking (button path and slash path
 - `packages/cli/src/command-center/fork-message.ts` — parse + picker + confirm helpers
 - `packages/cli/src/command-center/create.ts` — `/fork` message branches
 - `forkApp` / `forkFromCheckpoint` options: `{ targetCheckpointId?; targetMessageId? }`
+- After `replaceApp` to the child, TUI glue calls the child's `setModel` with the parent session's current provider/model/reasoning (via `getCurrentModelOption` + `getThoughtLevel`). Legacy `forkWorkspaceFromCheckpoint` does not persist `modelSelectionEntry` the way stable GUI fork does; without this carry-over the child opens unbound ("Select a model before continuing").
 - `packages/bootstrap/src/session-transcript.ts` — project `id` onto user+agent transcript messages (only allowed data-boundary change)
+
+## /resume list (known gap outside TUI glue)
+
+`/resume` picker data comes from `listSessionsForTui` → bootstrap `listZCodeSessions`, which hardcodes `roots: true` (`parent_id is null`). Legacy/stable forks set `parentID` on the child, so forked sessions are filtered out even though they already have a generated title (`Fork of …`). UI selection already knows how to render forks (`fork of <parent>`), but the list source never returns them. Fix requires bootstrap (or adapters list API) to allow non-root sessions for the TUI picker — not a core runtime change, and not doable in `packages/tui` / CLI TUI glue alone without re-implementing session-store listing.
 
 ## Busy
 
@@ -46,3 +51,4 @@ While the main session is busy/streaming, Fork is disabled in the action bar. Sl
 4. Cancel/Esc → no fork.
 5. Checkpoint `/fork` / `latest` / id forms unchanged.
 6. Transcript projection includes `id`.
+7. After switching to the forked session, the child has the same model/provider/reasoning as the parent had at fork time (UI glue `setModel`, not a core change).

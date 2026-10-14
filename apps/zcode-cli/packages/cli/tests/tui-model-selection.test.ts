@@ -356,6 +356,48 @@ test("fresh metadata follows the registry without requiring Coding Plan credenti
   assert.deepEqual((await readTuiSessionMetadata(f.app)).modelOptions, []);
 });
 
+test("TUI fork reapplies the parent model onto an unbound forked session", async () => {
+  const parentSelection = {
+    ...model().ref,
+    options: { reasoningLevel: "low" as const },
+  };
+  const created: Array<{ options: ZCodeAppOptions; writes: ModelSelection[] }> = [];
+  const deps = {
+    env: {},
+    cwd: () => process.cwd(),
+    skipUserConfig: true,
+    loadDotenv: () => ({ keys: [], loaded: false, path: "" }),
+    createZCodeApp: async (options: ZCodeAppOptions) => {
+      // legacy fork child has no modelSelectionEntry; resume starts unbound.
+      const initial = options.sessionId === "forked" ? undefined : parentSelection;
+      const f = fixture(initial);
+      f.app.forkFromCheckpoint = async () => ({
+        forkedSessionId: "forked",
+        response: "Forked.",
+        copiedMessageCount: 1,
+      });
+      created.push({ options, writes: f.writes });
+      return f.app;
+    },
+    startProcessProviderRegistryRuntime: async () => ({
+      runtime: { registryService: {} },
+      configuredDefaultModelSelection: parentSelection,
+      dispose() {},
+    }),
+  } as unknown as RunDependencies;
+  const handler = createTuiSubmitPrompt(deps, createCliModeState(), "test");
+  try {
+    const result = await handler("/fork", { abortSignal: new AbortController().signal });
+    assert.match(result.response, /Switched to forked session forked/);
+    assert.equal(created.at(-1)?.options.sessionId, "forked");
+    assert.deepEqual(created.at(-1)?.writes, [parentSelection]);
+    assert.equal(result.model, "personal/vendor/model$literal:free");
+    assert.equal(result.thoughtLevel, "low");
+  } finally {
+    await handler.close?.();
+  }
+});
+
 test("restoring incomplete reasoning does not fill a default or retain the previous effort", async () => {
   const f = fixture(model().ref);
   const metadata = await readTuiSessionMetadata(f.app);

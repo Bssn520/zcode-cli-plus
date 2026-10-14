@@ -9,6 +9,7 @@ import { createSelectionCopyHandler, hasCopyableSelectionText } from "./app-copy
 import { activeTuiTheme, resolveTuiThemeMode, setActiveTuiThemeMode } from "./theme/index.js";
 import { resolveInitialTerminalThemeMode } from "./theme/terminal.js";
 import type { TuiOptions } from "./types.js";
+import { createSuspendTerminal } from "./suspend-terminal.js";
 
 export const runTui = async (options: TuiOptions): Promise<number> => {
   if (!options.stdin.isTTY || !options.stdout.isTTY) {
@@ -106,10 +107,8 @@ export async function runTuiWithRenderer(
               themeModeListeners.delete(listener);
             };
           },
-          suspendTerminal: {
-            resume: () => renderer.resume(),
-            suspend: () => renderer.suspend(),
-          },
+          // 修改：外部编辑器退出后重同步终端尺寸（spawnSync 期间 SIGWINCH 会丢）
+          suspendTerminal: createSuspendTerminal(renderer),
         },
         copySelection,
         hasCopyableSelection: () =>
