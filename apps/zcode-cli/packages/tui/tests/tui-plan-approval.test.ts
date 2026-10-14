@@ -4,6 +4,7 @@ import type { KeyEvent } from "@mbears/opentui-core";
 import type { PermissionBrokerRequest, PermissionBrokerResult } from "@zcode/contracts";
 import { PlanApprovalPanel, PlanApprovalPanelView } from "../src/app-plan-approval-panel.js";
 import { wrapPlanApprovalHints } from "../src/app-plan-approval-hints.js";
+import { getZCodeCopy } from "@zcode/i18n";
 import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
 import { testRender } from "@mbears/opentui-react/test-utils";
 import React, { act } from "react";
@@ -221,7 +222,25 @@ test("browse help switches Enter action when comments exist", () => {
   const panelText = collectTextNodes(PlanApprovalPanelView({ state }))
     .map((line) => line.text)
     .join("\n");
-  assert.match(panelText, /Enter send feedback \(1 comments\)/u);
+  assert.match(panelText, /Enter send feedback \(1 comment\)/u);
+});
+
+test("plan approval count labels use English singular/plural and keep Chinese fixed", () => {
+  const en = DEFAULT_TUI_COPY.planApproval;
+  assert.equal(en.stepCount(1), "1 step");
+  assert.equal(en.stepCount(2), "2 steps");
+  assert.equal(en.commentCount(1), "1 comment");
+  assert.equal(en.commentCount(2), "2 comments");
+  assert.match(en.help(1), /Enter send feedback \(1 comment\)/u);
+  assert.match(en.help(2), /Enter send feedback \(2 comments\)/u);
+
+  const zh = getZCodeCopy("zh-CN").tui.planApproval;
+  assert.equal(zh.stepCount(1), "1 个步骤");
+  assert.equal(zh.stepCount(2), "2 个步骤");
+  assert.equal(zh.commentCount(1), "1 条意见");
+  assert.equal(zh.commentCount(2), "2 条意见");
+  assert.match(zh.help(1), /Enter 发送意见（1 条）/u);
+  assert.match(zh.help(2), /Enter 发送意见（2 条）/u);
 });
 
 
