@@ -1,0 +1,66 @@
+name: Upstream sync
+
+on:
+  schedule:
+    - cron: "0 2 * * 1" # 每周一 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: upstream
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+      - name: Compare tags
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api repos/zai-org/ZCode/tags --jq '.[0].name')
+          current=$(sed -n 's/^tag=//p' UPSTREAM_TAG)
+          echo "latest=$latest current=$current"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          [ "$latest" != "$current" ] && echo "changed=true" >> "$GITHUB_OUTPUT" || true
+      - name: Sync
+        if: steps.tag.outputs.changed == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.latest }}
+        run: |
+          git clone --depth 1 --branch "$TAG" https://github.com/zai-org/ZCode /tmp/ZCode
+          # tools/ + ci/ are fork assets on dev; upstream branch stays a pure upstream slice.
+          git fetch origin dev --depth 1
+          mkdir -p /tmp/fork && git --work-tree=/tmp/fork checkout origin/dev -- tools && git reset -q
+          bash /tmp/fork/tools/sync-upstream.sh /tmp/ZCode "$TAG" .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "sync: upstream ZCode $TAG"
+          git push origin upstream
+      - name: Open PR upstream -> dev
+        if: steps.tag.outputs.changed == 'true'
+        env:
+          # Prefer a PAT so the opened PR triggers CI; GITHUB_TOKEN PRs do not.
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+          TAG: ${{ steps.tag.outputs.latest }}
+        run: |
+          if [ -z "${{ secrets.UPSTREAM_SYNC_TOKEN }}" ]; then
+            echo "NOTE: UPSTREAM_SYNC_TOKEN unset; using GITHUB_TOKEN (PR CI will not auto-trigger)."
+          fi
+          gh pr create --base dev --head upstream \
+            --title "chore: 同步上游 ZCode $TAG" \
+            --body "自动同步上游 \`zai-org/ZCode\` $TAG。请检查冲突，并按 tools/README.md / ci/ 重新生成已知失败清单。" \
+            || echo "PR 已存在"

@@ -1,0 +1,122 @@
+# package	file	test	upstream_tag	status	note  (fail = deterministic; flaky = intermittent under parallel load; ci-env = fails only on GitHub CI runner; test='*' matches any case in that package+file)
+@zcode/adapters	tests/builtin-mcs-search-wire.test.ts	Published MCS and search final Anthropic wire account:bigmodel-offpeak-idle-plan / https://zcode.z.ai/api/v1/off-peak/anthropic / GLM-5.3-Flash	v3.15.1	fail	
+@zcode/adapters	tests/builtin-mcs-search-wire.test.ts	Published MCS and search final Anthropic wire account:zai-offpeak-idle-plan / https://zcode.z.ai/api/v1/off-peak/anthropic / GLM-5.3-Flash	v3.15.1	fail	
+@zcode/adapters	tests/config.test.ts	<file load error>	v3.15.1	fail	
+@zcode/adapters	tests/exec.test.ts	NodeExecutionAdapter timeout 只约束子进程运行阶段，准备较慢的命令不会未启动就被判 timed_out	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/adapters	tests/mcp-oauth-cross-process.e2e.test.ts	*	v3.15.1	flaky	timing-dependent; random sub-cases fail in CI under parallel load (file-level)
+@zcode/adapters	tests/mcp.test.ts	*	v3.15.1	flaky	timing-dependent; random sub-cases fail in CI under parallel load (file-level)
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB01' resolves model capability undefined to 32000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB02' resolves model capability 16000 to 16000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'OTB03' resolves model capability 64000 to 64000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'fractional normalization' resolves model capability 16000.9 to 16000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'invalid negative' resolves model capability -1 to 32000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'invalid non-finite' resolves model capability NaN to 32000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions 'invalid zero' resolves model capability +0 to 32000	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions adds a stable OpenCode Go session header to function createGenerateTextOptions(input) { const providerOptions = mergeProviderOptions(input.resolved.providerOptions, input.request.providerOptions); const providerOptionsWithMetadata = mergeAnthropicRequestMetadata({ metadataUserId: input.anthropicMetadataUserId, providerKind: input.resolved.providerKind, providerOptions }); const requestProviderOptions = withNativeGenerateOutputFormat({ providerOptions: providerOptionsWithMetadata, responseJsonSchema: input.request.responseJsonSchema, resolved: input.resolved }); return removeUndefined({ model: input.resolved.model, messages: (0,__vite_ssr_import_1__.toAiSdkMessages)(input.request.messages, { apiFormat: resolveProviderApiFormat(providerOptions), providerOptions, providerKind: input.resolved.providerKind, inputFormat: input.resolved.properties?.inputFormat }), tools: (0,__vite_ssr_import_2__.toAiSdkTools)(input.request.tools, { providerKind: input.resolved.providerKind, modelId: input.resolved.modelId, requiresMfjsToolSchema: input.resolved.properties.requiresMfjsToolSchema, supportsNativeWebSearch: input.resolved.properties.supportsNativeWebSearch }), toolChoice: toAiSdkToolChoice(input.request.toolChoice), temperature: input.request.temperature, topP: input.request.topP, topK: input.request.topK, presencePenalty: input.request.presencePenalty, frequencyPenalty: input.request.frequencyPenalty, stopSequences: input.request.stopSequences, seed: input.request.seed, output: input.request.responseJsonSchema ? __vite_ssr_import_0__.Output.object({ schema: (0,__vite_ssr_import_0__.jsonSchema)(input.request.responseJsonSchema) }) : undefined, providerOptions: requestProviderOptions, abortSignal: input.request.abortSignal, headers: mergeRequestHeaders(input.resolved.headers, (0,__vite_ssr_import_3__.createModelRequestAttributionHeaders)(input.statusContext)), allowSystemInMessages: true, maxRetries: 0, experimental_include: input.includeModelIO ? { requestBody: true, responseBody: true } : undefined }); } requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions adds a stable OpenCode Go session header to function createStreamTextOptions(input) { const providerOptions = mergeProviderOptions(input.resolved.providerOptions, input.request.providerOptions); const requestProviderOptions = mergeAnthropicRequestMetadata({ metadataUserId: input.anthropicMetadataUserId, providerKind: input.resolved.providerKind, providerOptions }); return removeUndefined({ model: input.resolved.model, messages: (0,__vite_ssr_import_1__.toAiSdkMessages)(input.request.messages, { apiFormat: resolveProviderApiFormat(providerOptions), providerOptions, providerKind: input.resolved.providerKind, inputFormat: input.resolved.properties?.inputFormat }), tools: (0,__vite_ssr_import_2__.toAiSdkTools)(input.request.tools, { providerKind: input.resolved.providerKind, modelId: input.resolved.modelId, requiresMfjsToolSchema: input.resolved.properties.requiresMfjsToolSchema, supportsNativeWebSearch: input.resolved.properties.supportsNativeWebSearch }), toolChoice: toAiSdkToolChoice(input.request.toolChoice), temperature: input.request.temperature, topP: input.request.topP, topK: input.request.topK, presencePenalty: input.request.presencePenalty, frequencyPenalty: input.request.frequencyPenalty, stopSequences: input.request.stopSequences, seed: input.request.seed, providerOptions: requestProviderOptions, abortSignal: input.request.abortSignal, headers: mergeRequestHeaders(input.resolved.headers, (0,__vite_ssr_import_3__.createModelRequestAttributionHeaders)(input.statusContext)), allowSystemInMessages: true, maxRetries: 0, includeRawChunks: input.request.preserveProviderStreamBoundaries ? true : undefined, experimental_include: createStreamExperimentalInclude(input) }); } requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions adds request attribution headers for generateText requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions adds request attribution headers for streamText requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions applies the same empty-user wire fallback to generate and stream requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions does not add OpenCode Go session header for other providers on the same host	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions fits oversized fixed Anthropic thinking into one immutable request budget	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps explicit Anthropic runtime-default output tokens	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps explicit generateText schemas on the native Anthropic output format	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps explicit model-level output tokens on non-Anthropic transport	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps native output params for legacy requests without a canonical budget	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps normal model capability budget for custom providers	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps normal model capability budget for gateway providers	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps normal model capability budget for openai providers	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps normal model capability budget for openai-compatible providers	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps provider runtime platform headers with request attribution headers	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps the Compact summary budget for OpenAI-compatible runtime-default requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps the Compact summary budget on Anthropic requests	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps the missing-budget compatibility behavior for 'legacy Anthropic request'	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps the missing-budget compatibility behavior for 'legacy non-Anthropic request'	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps the missing-budget compatibility behavior for 'model-capability source'	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions keeps the missing-budget compatibility behavior for 'runtime-default source'	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions lets the canonical budget override native OpenAI-compatible output params	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions maps a JSON response schema only into generateText structured output	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions packages native OpenAI reasoning effort without dropping static OpenAI options	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions passes experimental_include.responseBody for zcode-plan streams	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions passes resolved image support into generateText message transforms	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions preserves raw and sibling namespaces while projecting canonical options	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions rejects Anthropic fixed thinking when the total request budget is 0.5	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions rejects Anthropic fixed thinking when the total request budget is 1	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions rejects a non-object canonical extra_body	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions strips internal subagent and query prefixes from request attribution headers	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions strips video before the OpenAI Responses adapter sees an unsupported file part	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions subtracts fixed Anthropic thinking from the explicit model-level generateText budget	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions subtracts fixed Anthropic thinking from the explicit model-level streamText budget	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions unwraps OpenAI-compatible extra_body into the SDK provider namespace	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	createStreamTextOptions uses merged Responses provider options while transforming history	v3.15.1	fail	
+@zcode/adapters	tests/runner-options.test.ts	shouldIncludeStreamResponseBody enables responseBody capture for zcode-plan openai-compatible providers	v3.15.1	fail	
+@zcode/adapters	tests/session-store.test.ts	SQLite session store allows two Agent processes to migrate the same new database concurrently	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/app-subagent-legacy-init.test.ts	App 初始化旧 Subagent 身份 用户目录完成原地迁移再构造 Runtime；项目文件不迁移也不暗中换身份	v3.15.1	fail	
+@zcode/bootstrap	tests/dynamic-workflow-run-service.test.ts	*	v3.15.1	flaky	timing-dependent; random sub-cases fail in CI under parallel load (file-level)
+@zcode/bootstrap	tests/dynamic-workflow-skill.test.ts	bundled dynamic-workflows skill compiles every script block marked as complete	v3.15.1	ci-env	用户不使用该功能 (feature unused); CI-only failure
+@zcode/bootstrap	tests/fault-matrix-harness.test.ts	fault matrix harness — B1 healthy @ W2 driver 级：completed，请求数 = 逻辑请求数，闸门与时钟接上	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig Standalone 与 Desktop 一样丢弃内置套餐配置，API 只迁 Key	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 不把只有 model 选择、没有 provider 定义的内容迁成 Provider	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 不把旧 CLI 中已退出产品的 ZAPI 迁成 Personal Provider	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 不迁移历史 model options 中的输出上限	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 只把旧用户文件显式声明的 Provider 投影为 Personal Config	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 忽略旧 Provider Schema 接受但运行时没有消费的扩展字段	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 忽略旧 model options 中没有正式语义的任意字段	v3.15.1	fail	
+@zcode/bootstrap	tests/legacy-cli-personal-provider-config-importer.test.ts	importLegacyCliPersonalProviderConfig 忽略没有生产消费方的 reasoning replay 元数据	v3.15.1	fail	
+@zcode/bootstrap	tests/model-default-headers-wire.test.ts	模型请求默认 Header：Bootstrap → Adapter → 真实 SDK 真实 Runtime 标题 sidecar 沿公共工厂携带版本、other 类型和会话追踪	v3.15.1	fail	
+@zcode/bootstrap	tests/provider-registry-app-runtime.test.ts	ZCode App Provider Registry runtime Expert Workflow 子 Runtime 继续使用进程 Registry 的 ModelFactory	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/provider-registry-app-runtime.test.ts	ZCode App Provider Registry runtime Registry 模式的 Workflow 子 Runtime 复用主 App Adapter	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/provider-registry-selection.test.ts	listRegistryBackedModels 直接把 Registry 事实投影为协议 Model Option，不建立内部 alias DTO	v3.15.1	fail	
+@zcode/bootstrap	tests/provider-runtime-headers-cancel.test.ts	真实工厂同样装配唯一请求端口，完整账号事实透传而不写旧 ModelRef	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/read-pdf-model-switch.e2e.test.ts	Read PDF model capability switching E2E omits and restores raw PDF data in final provider requests	v3.15.1	fail	
+@zcode/bootstrap	tests/read-pdf.e2e.test.ts	Read PDF provider and cold-resume E2E preserves the final Chat page order after a real runtime cold resume	v3.15.1	fail	
+@zcode/bootstrap	tests/runtime-unbound-config.test.ts	Runtime 创建与未绑定恢复的边界 新建空白会话没有 configured default 时保持未绑定，等待显式提交选择	v3.15.1	fail	
+@zcode/bootstrap	tests/script-workflow.test.ts	script workflow runtime persists child sessions before linking workflow activities	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence blocks ZCode Protocol startup on database migration before protocol connection	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence can explicitly hydrate a resumed app before the next prompt	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence hydrates persisted history when resuming a session in a fresh app	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence initializes the Bash shell snapshot before direct expert workflow child sessions	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence routes AI SDK warnings away from ZCode Protocol stdout	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence schedules log retention cleanup after ZCode Protocol startup completes	v3.15.1	fail	
+@zcode/bootstrap	tests/session-persistence.test.ts	session persistence uses the current model for new expert workflow child sessions after a model switch	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/v4-cold-resume.test.ts	v4 冷恢复（集成：真 sqlite + server + binder） 重启后冷订阅：优先从 Agent durable selection 恢复 task-local thought	v3.15.1	fail	
+@zcode/bootstrap	tests/v4-cold-resume.test.ts	v4 冷恢复（集成：真 sqlite + server + binder） 重启后冷订阅：旧 fork 消息缺档位时不借用相邻消息的档位	v3.15.1	fail	
+@zcode/bootstrap	tests/v4-cold-resume.test.ts	v4 冷恢复（集成：真 sqlite + server + binder） 重启后冷订阅：旧 transcript 无档位时留空，不读取 task-index 提示	v3.15.1	fail	
+@zcode/bootstrap	tests/v4-gateway.test.ts	projection 16MiB fault 与恢复 oversize model event 原子拒绝并只终止一次，TurnError 与 cold hydrate 均保持可传输	v3.15.1	flaky	timing/concurrency
+@zcode/bootstrap	tests/v4-gateway.test.ts	v4/command 收口 Core admission ACK 不等待 TurnStarted projection；旧 revision retry/file rewind 只 stale	v3.15.1	fail	
+@zcode/bootstrap	tests/v4-native-boundary.test.ts	v4 原生边界禁令（无桥） zcode-protocol-v4/ 下任何文件不得 import 旧协议目录（zcode-protocol/）	v3.15.1	fail	
+@zcode/bootstrap	tests/v4-native-interaction-background.test.ts	v4 原生 cancelBackgroundWork dwf run：workId 一路打到 DynamicWorkflowRunPort.cancel	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B1 healthy — 装配基线 W4/anthropic-messages：completed，请求数 = 逻辑请求数，零失败	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B2 gate(2) — 3008 在 workflow 内是重试，不是终止 W16/anthropic-messages：completed、零失败子代理、拒绝数有界、cap 收敛、每个 3008 配一条 retry_scheduled	v3.15.1	flaky	CI-only, intermittent timing failure (run 38542311185)
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B3 failFirst(2P, 429) — 普通 429 限流在内重试 W4/anthropic-messages：completed，失败数 = N，请求数 = 逻辑请求数 + N	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/bootstrap	tests/workflow-fault-matrix.retry.test.ts	fault matrix · B9 everyKth(3, stream_error 3008) — 流内业务码走同一策略 W4/anthropic-messages：completed，每个流内 3008 配一条 retry_scheduled{rate_limited}	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model API Key Personal Overlay 经 Registry 原样装配到 Adapter	v3.15.1	fail	
+@zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model Account 约束 Built-in 成员后仍由 Personal Overlay 最后覆盖	v3.15.1	fail	
+@zcode/bootstrap	tests/zcode-builtin-model-runtime-integration.test.ts	真实 ZCode Built-in Config 到 Active Model 隐藏 Request Auth Provider 仍由普通 Registry 精确创建 Model	v3.15.1	fail	
+@zcode/bootstrap	tests/zcode-protocol.test.ts	ZCodeProtocolAgentServer injects pull access only into advertised local sessions (undefined)	v3.15.1	fail	
+@zcode/bootstrap	tests/zcode-protocol.test.ts	ZCodeProtocolAgentServer 通过独立协议同步 Account Config，不再从 Workspace Snapshot 反向投影	v3.15.1	fail	
+@zcode/cli	tests/build-sea.test.mjs	allows skill-only official plugins when SEA runtime assets are required	v3.15.1	fail	
+@zcode/cli	tests/build-sea.test.mjs	includes TUI workspace runtime package assets	v3.15.1	fail	
+@zcode/cli	tests/build-sea.test.mjs	loads TUI from an extracted SEA runtime dependency closure	v3.15.1	fail	
+@zcode/cli	tests/build-sea.test.mjs	requires SEA runtime assets for runtime-backed official plugins	v3.15.1	fail	
+@zcode/cli	tests/build-sea.test.mjs	requires the Browser Use client alongside the SEA MCP runtime	v3.15.1	fail	
+@zcode/cli	tests/cli.unit.test.ts	borrows one process provider registry for a headless prompt and disposes it	v3.15.1	fail	
+@zcode/cli	tests/cli.unit.test.ts	reuses one process provider registry across TUI app replacements	v3.15.1	fail	
+@zcode/contracts	tests/model-retry-budget.test.ts	ModelRetryBudget exposes the two budget tiers	v3.15.1	fail	
+@zcode/core	tests/create-workflow-permission.test.ts	CreateWorkflow run confirmation still asks, without a preview, when the approval hook throws	v3.15.1	flaky	timing/concurrency; passed this collection run
+@zcode/core	tests/io-boundary.test.ts	core I/O boundaries keeps in-process HTTP egress behind adapter network boundaries	v3.15.1	fail	
+@zcode/core	tests/message-persistence-anchor.test.ts	v4 transcript 锚点（additive JSON） persistAssistantMessage：anchor 带 turnId；无 turnId 时不写空对象	v3.15.1	fail	
+@zcode/core	tests/runtime-compact.test.ts	AgentRuntime manual compact uses the runtime effective output budget when assembling Microcompact policy	v3.15.1	fail	
+@zcode/core	tests/runtime-module-boundary.test.ts	runtime module boundary keeps runtime source modules below the file-size ceiling	v3.15.1	fail	
+@zcode/core	tests/runtime-trace.test.ts	AgentRuntime trace propagation keeps structured context prefix before real user messages across turns	v3.15.1	fail	
+@zcode/core	tests/runtime-unbound-resume.test.ts	未绑定模型的 Session 历史恢复 未选择模型的执行失败不调用 Factory，也不制造默认 Selection	v3.15.1	fail	
+@zcode/core	tests/subagent-background.test.ts	subagent background notifications drains pending background notifications as strict snapshot batches	v3.15.1	fail	
+@zcode/core	tests/tool-contracts.test.ts	tool contract declarations keeps built-in tool JSON schemas provider-compatible	v3.15.1	fail	
+@zcode/dynamic-workflow	tests/engine/engine.test.ts	WorkflowEngine — report restores the report count across resume so the cap is run-level	v3.15.1	flaky	CI-only, intermittent: failed in only one of two CI attempts (run 38527396513) under parallel load; passes locally
+@zcode/dynamic-workflow	tests/hole-sites.test.ts	a tail chain twenty fills deep keeps every fill stable and every id as short at step 20 as at step 1	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/dynamic-workflow	tests/hole-sites.test.ts	a tail chain twenty fills deep records each step's enclosing step in fill, so nesting survives without being spelled in the id	v3.15.1	ci-env	CI-only, timing-sensitive: failed on both CI attempts (run 38527396513) on GitHub runner, passes locally
+@zcode/dynamic-workflow-runtime	tests/args.test.ts	args in the sandbox freezes the top level of the bag	v3.15.1	flaky	timing/concurrency; passed this collection run
+@zcode/dynamic-workflow-runtime	tests/e2e.test.ts	e2e — Promise.race with a losing in-flight ask completes with the winner and aborts the loser at the driver	v3.15.1	flaky	CI-only, intermittent timing failure (run 38542311185)
+@zcode/tui	tests/tui-app.test.ts	Shift+Tab can cycle edit mode to yolo mode	v3.15.1	fail	
+@zcode/tui	tests/tui-app.test.ts	Shift+Tab switches mode through the injected mode setter	v3.15.1	fail	
+@zcode/tui	tests/tui-app.test.ts	mode composer popup can submit edit mode command	v3.15.1	fail	

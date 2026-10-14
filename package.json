@@ -7,9 +7,12 @@
     "build": "pnpm --dir apps/zcode-cli build",
     "cli:build": "pnpm --dir apps/zcode-cli cli:build",
     "test": "pnpm --dir apps/zcode-cli test",
+    "test:ci": "bash ci/test-known-failures.sh",
     "typecheck": "pnpm --dir apps/zcode-cli typecheck",
-    "lint": "pnpm --dir apps/zcode-cli lint",
+    "lint": "oxlint",
+    "ci:local": "bash ci/run-ci-local.sh",
     "build:sea": "pnpm --dir apps/zcode-cli build:sea",
+    "build:sea:all": "pnpm install && pnpm --dir apps/zcode-cli build:sea",
     "release:cli": "pnpm --dir apps/zcode-cli run release",
     "release:cli:dry": "pnpm --dir apps/zcode-cli run release:dry"
   },
