@@ -37,7 +37,7 @@ import type {
   RunDependencies,
   RunPromptHeadlessOptions,
 } from "./cli-types.js";
-import { createTimeoutError, isTimeoutError, parseCliModelOption, parseCliTimeoutSeconds } from "./headless-flags.js";
+import { isTimeoutError, parseCliModelOption, parseCliTimeoutSeconds } from "./headless-flags.js";
 import { combinePromptWithStdin, readStdinTextIfPiped } from "./stdin-text.js";
 import { DEFAULT_CLI_CLEANUP_TIMEOUT_MS } from "./shutdown.js";
 
@@ -593,7 +593,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       if (timedOut && timeoutSeconds !== undefined) {
         // Keep failsafe watchdog; clear only the main timer.
         clearTimeout(timeoutArm!.timeoutTimer);
-        ctx.stderr.write(`Error: ${createTimeoutError(timeoutSeconds).message}\n`);
+        ctx.stderr.write(`zcp: timed out after ${timeoutSeconds}s\n`);
         return 2;
       }
       if (timeoutArm) {

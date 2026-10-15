@@ -527,7 +527,12 @@ export const runPrompt = async (
       isTimeoutError(error) ||
       isTimeoutError(abortController.signal.reason);
     const message = error instanceof Error ? error.message : String(error);
-    ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
+    // 超时 abort 常被上层改写成 "Turn was cancelled."，这里单独给出可脚本识别的提示。
+    if (timeoutHit && headlessOptions.timeoutSeconds !== undefined) {
+      ctx.stderr.write(`zcp: timed out after ${headlessOptions.timeoutSeconds}s\n`);
+    } else {
+      ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
+    }
     if (options.verbose) {
       if (error instanceof Error && error.cause) {
         ctx.stderr.write(`Cause: ${error.cause}\n`);

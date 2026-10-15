@@ -174,7 +174,7 @@ test("--timeout covers hanging stdin before submitPrompt", async () => {
 
   assert.equal(code, 2);
   assert.equal(submitted, false);
-  assert.match(ctx.stderr.output(), /timed out after 1s/);
+  assert.match(ctx.stderr.output(), /zcp: timed out after 1s/);
   assert.ok(elapsedMs >= 900, `expected ~1s timeout, got ${elapsedMs}ms`);
   assert.ok(elapsedMs < 2500, `timeout during stdin took too long: ${elapsedMs}ms`);
   process.exitCode = undefined;
@@ -229,17 +229,15 @@ test("--timeout aborts a hanging submitPrompt with exit 2", async () => {
             await new Promise<never>((_resolve, reject) => {
               const signal = options?.abortSignal;
               if (!signal) return;
+              // 对齐真实 runtime：abort 后抛出 Turn was cancelled，而非 timeout reason。
+              const rejectCancelled = () => {
+                reject(new Error("Turn was cancelled."));
+              };
               if (signal.aborted) {
-                reject(signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason)));
+                rejectCancelled();
                 return;
               }
-              signal.addEventListener(
-                "abort",
-                () => {
-                  reject(signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason)));
-                },
-                { once: true },
-              );
+              signal.addEventListener("abort", rejectCancelled, { once: true });
             });
           },
         }) as never,
@@ -249,7 +247,7 @@ test("--timeout aborts a hanging submitPrompt with exit 2", async () => {
   );
 
   assert.equal(code, 2);
-  assert.match(ctx.stderr.output(), /timed out after 1s/);
+  assert.match(ctx.stderr.output(), /zcp: timed out after 1s/);
   assert.equal(ctx.stdout.output(), "");
   process.exitCode = undefined;
 });
