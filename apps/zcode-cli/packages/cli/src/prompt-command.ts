@@ -23,6 +23,7 @@ import {
   DEFAULT_CLI_CLEANUP_TIMEOUT_MS,
   registerCliShutdownHandlers,
   runCliCleanupWithTimeout,
+  scheduleCliExitWatchdog,
 } from "./shutdown.js";
 import { runSkillsCommand } from "./skills-command.js";
 import {
@@ -38,7 +39,45 @@ import type {
   CliResumeRequest,
   ModeCapableApp,
   RunDependencies,
+  RunPromptHeadlessOptions,
 } from "./cli-types.js";
+import {
+  completeCliModelSelection,
+  createTimeoutError,
+  isTimeoutError,
+} from "./headless-flags.js";
+import { createEphemeralSessionStore, type EphemeralSessionStoreHandle } from "./no-session-store.js";
+
+/** Wall-clock timeout armed before stdin so --timeout covers the whole headless run. */
+export type HeadlessTimeoutArm = {
+  abortController: AbortController;
+  timeoutTimer: NodeJS.Timeout;
+  state: {
+    timedOut: boolean;
+    cancelTimeoutWatchdog?: () => void;
+  };
+};
+
+export function armHeadlessTimeout(options: {
+  timeoutSeconds: number;
+  cleanupTimeoutMs: number;
+  exitProcess?: (code: number) => void;
+}): HeadlessTimeoutArm {
+  const abortController = new AbortController();
+  const state: HeadlessTimeoutArm["state"] = { timedOut: false };
+  const timeoutTimer = setTimeout(() => {
+    state.timedOut = true;
+    process.exitCode = 2;
+    abortController.abort(createTimeoutError(options.timeoutSeconds));
+    // Provider retries may ignore abort; force the process out after cleanup budget.
+    state.cancelTimeoutWatchdog = scheduleCliExitWatchdog({
+      exitCode: 2,
+      exitProcess: options.exitProcess,
+      timeoutMs: options.cleanupTimeoutMs + 1_000,
+    });
+  }, options.timeoutSeconds * 1000);
+  return { abortController, timeoutTimer, state };
+}
 
 /**
  * Does this run print a JSON summary at the end?
@@ -64,7 +103,6 @@ const MEMORY_BENCH_DISABLED_ERROR =
   "--memory-bench requires Project Memory to be enabled (features.memory=true and memory.use=true).";
 const TARGET_SELECTION_UNAVAILABLE_ERROR =
   "Headless goal commands cannot open an interactive replacement picker. Re-run with --target-replace or use /goal replace <objective>.";
-
 export const runPrompt = async (
   ctx: RunContext,
   prompt: string,
@@ -78,6 +116,7 @@ export const runPrompt = async (
   forceMcs = false,
   presentationSurface: PresentationSurface = "terminal",
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
+  headlessOptions: RunPromptHeadlessOptions = {},
 ): Promise<number> => {
   if (prompt.trim().length === 0) {
     ctx.stderr.write(`${EMPTY_PROMPT_ERROR}\n`);
@@ -143,11 +182,30 @@ export const runPrompt = async (
   let providerRegistryRuntime: Awaited<
     ReturnType<NonNullable<RunDependencies["startProcessProviderRegistryRuntime"]>>
   >;
-  const abortController = new AbortController();
+  const armedTimeout = (headlessOptions as { timeoutArm?: HeadlessTimeoutArm }).timeoutArm;
+  const abortController = armedTimeout?.abortController ?? new AbortController();
   const cleanupTimeoutMs = Math.max(
     1,
     Math.trunc(deps.shutdownCleanupTimeoutMs ?? DEFAULT_CLI_CLEANUP_TIMEOUT_MS),
   );
+  const timeoutState = armedTimeout?.state ?? { timedOut: false };
+  let timeoutTimer: NodeJS.Timeout | undefined = armedTimeout?.timeoutTimer;
+  let ephemeralSession: EphemeralSessionStoreHandle | undefined;
+  if (headlessOptions.timeoutSeconds !== undefined && !armedTimeout) {
+    const timeoutSeconds = headlessOptions.timeoutSeconds;
+    timeoutTimer = setTimeout(() => {
+      timeoutState.timedOut = true;
+      process.exitCode = 2;
+      const timeoutError = createTimeoutError(timeoutSeconds);
+      abortController.abort(timeoutError);
+      // Provider retries may ignore abort; force the process out after cleanup budget.
+      timeoutState.cancelTimeoutWatchdog = scheduleCliExitWatchdog({
+        exitCode: 2,
+        exitProcess: deps.exitProcess,
+        timeoutMs: cleanupTimeoutMs + 1_000,
+      });
+    }, timeoutSeconds * 1000);
+  }
   const closeApp = async (): Promise<void> => {
     const targetApp = app;
     closePromise ??= (async () => {
@@ -237,6 +295,9 @@ export const runPrompt = async (
       workingDirectory,
     });
     browserRuntime = createCliHeadlessBrowserRuntime(options, deps);
+    if (headlessOptions.noSession) {
+      ephemeralSession = await createEphemeralSessionStore();
+    }
     app = await createApp({
       browserControlPort: browserRuntime?.browserControlPort,
       env: appEnv,
@@ -253,6 +314,7 @@ export const runPrompt = async (
             providerRuntimeHeadersPort: providerRegistryRuntime.providerRuntimeHeadersPort,
           }
         : {}),
+      ...(ephemeralSession ? { sessionStore: ephemeralSession.store } : {}),
       resume: sessionId !== undefined,
       runtimeConfig: {
         ...(mode ? { mode } : {}),
@@ -260,6 +322,19 @@ export const runPrompt = async (
         ...(forceMcs ? { midConversationSystem: { mode: "force" as const } } : {}),
         ...resolveWorkflowModeRuntimeConfig(workflowMode),
         memory: { extractionEnabled: options.memoryBench === true },
+        ...(headlessOptions.modelSelection
+          ? {
+              modelSelection: completeCliModelSelection(
+                headlessOptions.modelSelection,
+                providerRegistryRuntime.runtime.registryService
+                  .getModel?.(
+                    headlessOptions.modelSelection.providerId,
+                    headlessOptions.modelSelection.modelId,
+                  )
+                  ?.config.optionSpecs.reasoningLevel.values,
+              ),
+            }
+          : {}),
         modelStreaming: "on",
         presentationSurface,
         workingDirectory,
@@ -447,8 +522,17 @@ export const runPrompt = async (
     ctx.stdout.write(`${turnResponses.join("\n\n")}\n`);
     return 0;
   } catch (error) {
+    const timeoutHit =
+      timeoutState.timedOut ||
+      isTimeoutError(error) ||
+      isTimeoutError(abortController.signal.reason);
     const message = error instanceof Error ? error.message : String(error);
-    ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
+    // 超时 abort 常被上层改写成 "Turn was cancelled."，这里单独给出可脚本识别的提示。
+    if (timeoutHit && headlessOptions.timeoutSeconds !== undefined) {
+      ctx.stderr.write(`zcp: timed out after ${headlessOptions.timeoutSeconds}s\n`);
+    } else {
+      ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
+    }
     if (options.verbose) {
       if (error instanceof Error && error.cause) {
         ctx.stderr.write(`Cause: ${error.cause}\n`);
@@ -457,11 +541,19 @@ export const runPrompt = async (
         ctx.stderr.write(`${error.stack}\n`);
       }
     }
+    if (timeoutHit) {
+      // Keep the failsafe watchdog until process exit; do not cancel it here.
+      return 2;
+    }
+    timeoutState.cancelTimeoutWatchdog?.();
     return 1;
   } finally {
+    if (timeoutTimer) clearTimeout(timeoutTimer);
+    if (!timeoutState.timedOut) timeoutState.cancelTimeoutWatchdog?.();
     stopObservingEvents();
     unregisterShutdownHandlers();
     await closeApp();
+    await ephemeralSession?.dispose();
   }
 };
 

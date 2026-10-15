@@ -21,7 +21,7 @@ import { runLoginCommand, runLogoutCommand } from "./login-command.js";
 import { CLI_COMMAND_NAME, CLI_PROCESS_NAME } from "./process-name.js";
 import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-command.js";
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
-import { runPrompt } from "./prompt-command.js";
+import { armHeadlessTimeout, runPrompt, type HeadlessTimeoutArm } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
@@ -35,7 +35,11 @@ import type {
   CliResumeRequest,
   CliTargetRequest,
   RunDependencies,
+  RunPromptHeadlessOptions,
 } from "./cli-types.js";
+import { isTimeoutError, parseCliModelOption, parseCliTimeoutSeconds } from "./headless-flags.js";
+import { combinePromptWithStdin, readStdinTextIfPiped } from "./stdin-text.js";
+import { DEFAULT_CLI_CLEANUP_TIMEOUT_MS } from "./shutdown.js";
 
 export type { RunDependencies } from "./cli-types.js";
 
@@ -56,6 +60,11 @@ const BROWSER_USE_SCOPE_ERROR =
 const SURFACE_SCOPE_ERROR =
   "--surface can only be used with --prompt, --target, app-server, or agent-server.";
 const MEMORY_BENCH_SCOPE_ERROR = "--memory-bench can only be used with -p/--prompt.";
+const NO_SESSION_CONFLICT_ERROR =
+  "--no-session cannot be used with --resume or --continue.";
+const MODEL_SCOPE_ERROR = "--model can only be used with --prompt or --target.";
+const TIMEOUT_SCOPE_ERROR = "--timeout can only be used with --prompt or --target.";
+const NO_SESSION_SCOPE_ERROR = "--no-session can only be used with --prompt or --target.";
 
 const pluginsCommandFlags = (
   values: ReturnType<typeof parseGlobalArgs>["values"],
@@ -387,7 +396,26 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     ctx.stderr.write("--resume and --continue cannot be used together.\n");
     return 1;
   }
+  const noSession = parsed.values["no-session"] === true;
+  if (noSession && (resumeRequest.continueSession || resumeRequest.resumeSessionId)) {
+    ctx.stderr.write(`${NO_SESSION_CONFLICT_ERROR}\n`);
+    return 1;
+  }
 
+  let modelSelection: RunPromptHeadlessOptions["modelSelection"];
+  let timeoutSeconds: number | undefined;
+  try {
+    if (typeof parsed.values.model === "string") {
+      modelSelection = parseCliModelOption(parsed.values.model);
+    }
+    if (typeof parsed.values.timeout === "string") {
+      timeoutSeconds = parseCliTimeoutSeconds(parsed.values.timeout);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    ctx.stderr.write(`${message}\n`);
+    return 1;
+  }
   const env = prepareCliRuntimeEnv(deps.env ?? process.env);
   const detectedLocale = detectCliLocale(env);
   let outputFormat: GlobalOptions["outputFormat"];
@@ -516,10 +544,69 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     },
   };
 
+  const isHeadlessPromptOrTarget =
+    typeof parsed.values.prompt === "string" || targetRequest !== undefined;
+  if (modelSelection && !isHeadlessPromptOrTarget) {
+    ctx.stderr.write(`${MODEL_SCOPE_ERROR}\n`);
+    return 1;
+  }
+  if (timeoutSeconds !== undefined && !isHeadlessPromptOrTarget) {
+    ctx.stderr.write(`${TIMEOUT_SCOPE_ERROR}\n`);
+    return 1;
+  }
+  if (noSession && !isHeadlessPromptOrTarget) {
+    ctx.stderr.write(`${NO_SESSION_SCOPE_ERROR}\n`);
+    return 1;
+  }
+
+  const headlessOptions: RunPromptHeadlessOptions = {
+    ...(modelSelection ? { modelSelection } : {}),
+    ...(noSession ? { noSession: true } : {}),
+    ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+  };
+
   if (typeof parsed.values.prompt === "string") {
+    let promptText = parsed.values.prompt;
+    // Arm --timeout before stdin so idle/open pipes cannot outlive the deadline.
+    let timeoutArm: HeadlessTimeoutArm | undefined;
+    if (timeoutSeconds !== undefined) {
+      timeoutArm = armHeadlessTimeout({
+        timeoutSeconds,
+        cleanupTimeoutMs: Math.max(
+          1,
+          Math.trunc(commandDeps.shutdownCleanupTimeoutMs ?? DEFAULT_CLI_CLEANUP_TIMEOUT_MS),
+        ),
+        exitProcess: commandDeps.exitProcess,
+      });
+    }
+    try {
+      // Only consume stdin when -p/--prompt is present; never for TUI/subcommand paths.
+      const stdinText = await readStdinTextIfPiped(ctx.stdin, {
+        signal: timeoutArm?.abortController.signal,
+      });
+      promptText = combinePromptWithStdin(promptText, stdinText);
+    } catch (error) {
+      const timedOut =
+        timeoutArm?.state.timedOut === true ||
+        isTimeoutError(error) ||
+        isTimeoutError(timeoutArm?.abortController.signal.reason);
+      if (timedOut && timeoutSeconds !== undefined) {
+        // Keep failsafe watchdog; clear only the main timer.
+        clearTimeout(timeoutArm!.timeoutTimer);
+        ctx.stderr.write(`zcp: timed out after ${timeoutSeconds}s\n`);
+        return 2;
+      }
+      if (timeoutArm) {
+        clearTimeout(timeoutArm.timeoutTimer);
+        timeoutArm.state.cancelTimeoutWatchdog?.();
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.stderr.write(`Error: ${message}\n`);
+      return 1;
+    }
     return await runPrompt(
       ctx,
-      parsed.values.prompt,
+      promptText,
       parsed.values.attach ?? [],
       options,
       commandDeps,
@@ -530,6 +617,9 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       forceMcs,
       presentationSurface,
       workflowMode,
+      (timeoutArm
+        ? { ...headlessOptions, timeoutArm }
+        : headlessOptions) as RunPromptHeadlessOptions,
     );
   }
 
@@ -547,6 +637,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       forceMcs,
       presentationSurface,
       workflowMode,
+      headlessOptions,
     );
   }
 

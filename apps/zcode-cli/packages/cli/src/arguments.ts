@@ -104,6 +104,15 @@ export const parseGlobalArgs = (argv: string[]) =>
         multiple: true,
         type: "string",
       },
+      model: {
+        type: "string",
+      },
+      timeout: {
+        type: "string",
+      },
+      "no-session": {
+        type: "boolean",
+      },
     },
     strict: true,
   });

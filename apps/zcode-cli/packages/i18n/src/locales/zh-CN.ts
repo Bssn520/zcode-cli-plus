@@ -42,6 +42,11 @@ export const zhCN: ZCodeCopy = {
   --force-mcs      对 Anthropic provider 强制启用 mid-conversation system 投影
   --locale <locale>  UI 语言：en-US、zh-CN 或 auto
   --mode <mode>    prompt 权限模式：build、edit、plan、yolo 或 guarded（--prompt 默认 yolo）
+  --model <provider/model>  仅覆盖本次 --prompt/--target 的模型选择
+  --timeout <seconds>  无头运行超过 N 秒后中止（退出码 2）；脚本场景建议始终带上
+  --no-session     使用临时 session DB，运行结束后删除
+  --output-format <text|json|stream-json>  无头输出形态（默认 text；--json 仍可用）
+  非 TTY 的 stdin 与 -p/--prompt <text> 合用时，会前置拼成 "stdin\\n\\nprompt"（上限 10MB）。裸 -p 仍需要参数值。
   --resume <sessionId>  按 sessionId 恢复持久化 session（sess_...）
   --target <text>  在 headless 模式运行或设置 session goal
   --target-replace 替换 --target 已存在的 goal
