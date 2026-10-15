@@ -68,8 +68,12 @@ export function formatImageAttachmentFallback(input: {
 /** Kitty graphics protocol: transmit PNG/JPEG payload as base64. */
 export function encodeKittyImage(input: {
   base64: string;
+  /** Display width in terminal columns. */
+  columns?: number;
   height?: number;
   mediaType?: string;
+  /** Display height in terminal rows. */
+  rows?: number;
   width?: number;
 }): string {
   const format = kittyFormat(input.mediaType);
@@ -85,6 +89,8 @@ export function encodeKittyImage(input: {
         `f=${format}`,
         input.width ? `s=${input.width}` : undefined,
         input.height ? `v=${input.height}` : undefined,
+        input.columns ? `c=${input.columns}` : undefined,
+        input.rows ? `r=${input.rows}` : undefined,
         `m=${more}`,
       ].filter(Boolean);
       chunks.push(`\x1b_G${sizeParts.join(",")};${slice}\x1b\\`);
@@ -98,18 +104,37 @@ export function encodeKittyImage(input: {
 /** iTerm2 / WezTerm inline image via OSC 1337. */
 export function encodeITermImage(input: {
   base64: string;
+  /** Display width in character cells; takes precedence over width px. */
+  columns?: number;
   height?: number;
   name?: string;
+  /** Display height in character cells; takes precedence over height px. */
+  rows?: number;
   width?: number;
 }): string {
+  const widthArg = input.columns
+    ? `width=${input.columns}`
+    : input.width
+      ? `width=${input.width}px`
+      : undefined;
+  const heightArg = input.rows
+    ? `height=${input.rows}`
+    : input.height
+      ? `height=${input.height}px`
+      : undefined;
   const args = [
     "inline=1",
     input.name ? `name=${Buffer.from(input.name, "utf8").toString("base64")}` : undefined,
-    input.width ? `width=${input.width}px` : undefined,
-    input.height ? `height=${input.height}px` : undefined,
+    widthArg,
+    heightArg,
     "preserveAspectRatio=1",
   ].filter(Boolean);
   return `\x1b]1337;File=${args.join(":")}:${input.base64}\x07`;
+}
+
+/** Delete all Kitty image placements on screen. */
+export function encodeKittyDeleteAll(): string {
+  return "\x1b_Ga=d,d=a\x1b\\";
 }
 
 function kittyFormat(mediaType: string | undefined): number {

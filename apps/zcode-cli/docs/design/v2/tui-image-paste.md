@@ -89,9 +89,12 @@ Fork additions on top of clipboard paste (packages/tui only):
   `ZCP_IMAGE_PROTOCOL=kitty|iterm|none` override; else
   `KITTY_WINDOW_ID` / `TERM=xterm-kitty` / `TERM_PROGRAM=ghostty` → kitty;
   `TERM_PROGRAM=iTerm.app|WezTerm` → iterm; else none. Sixel is out of scope.
-  Kitty/iTerm escape helpers live as pure functions with unit tests; the bar
-  annotates the protocol because OpenTUI cannot emit graphics sequences from
-  text nodes yet.
+  Kitty/iTerm escape helpers live as pure functions with unit tests. When the
+  protocol is kitty/iterm, the bar reserves a 6×12 cell box per image and, on
+  OpenTUI `FRAME` (after native flush), writes graphics sequences at the box
+  absolute cursor with ESC 7 / CUP / payload / ESC 8; tmux gets passthrough
+  wrapping. Redraw only when the overlay signature changes; kitty clears with
+  `a=d`, iTerm relies on cell repaint. `protocol=none` keeps the text fallback.
 - `Ctrl+O` opens the last image attachment in the system viewer via a temp file
   (`xdg-open` / `open` / Windows `start`), detached. Status and the attachment
   bar show `Ctrl+O open last image`.
