@@ -124,8 +124,8 @@ export function createShikiCodeFenceRenderNode(
       streaming: false,
       treeSitterClient: context.treeSitterClient ?? base.treeSitterClient,
       width: "100%",
-      marginTop: base.marginTop,
-      marginBottom: base.marginBottom,
+      marginTop: base.marginTop ?? undefined,
+      marginBottom: base.marginBottom ?? undefined,
       onChunks,
     });
     base.destroy();
