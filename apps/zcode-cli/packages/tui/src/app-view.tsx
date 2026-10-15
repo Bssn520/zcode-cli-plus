@@ -13,6 +13,7 @@ import { FileMentionPanel } from "./app-file-mention-panel.js";
 import type { FileMentionState } from "./app-file-mentions.js";
 import { EffortSuggestionPanel } from "./app-effort-suggestion-panel.js";
 import { InputPane, type PromptInputEditor } from "./app-input-pane.js";
+import { ImageAttachmentBar } from "./app-image-attachment-bar.js";
 import { InputActiveStatus } from "./app-input-status.js";
 import { QueuedInputPanel } from "./app-queued-inputs.js";
 import { ModeSuggestionPanel } from "./app-mode-suggestion-panel.js";
@@ -28,6 +29,7 @@ import type {
   ApprovalPrompt,
   CacheStats,
   ContextUsage,
+  DraftAttachment,
   EffortCommandSelectionState,
   Message,
   ModifiedFileStat,
@@ -60,6 +62,7 @@ export function AppView(props: {
   copy: ReturnType<typeof import("@zcode/i18n").getZCodeCopy>["tui"];
   copyCurrentSelection: () => boolean;
   draft: string;
+  draftAttachments?: readonly DraftAttachment[];
   editorRef: React.MutableRefObject<PromptInputEditor | null>;
   effortOptions: readonly TuiEffortOption[];
   effortSelection?: EffortCommandSelectionState;
@@ -213,6 +216,7 @@ export function AppView(props: {
               contextUsage: props.contextUsage,
               copy: props.copy,
               draft: props.draft,
+              draftAttachments: props.draftAttachments,
               editorRef: props.editorRef,
               effortOptions: props.effortOptions,
               effortSelection: props.effortSelection,
@@ -244,6 +248,7 @@ export function ComposerInputArea(props: {
   contextUsage: ContextUsage;
   copy: ReturnType<typeof import("@zcode/i18n").getZCodeCopy>["tui"];
   draft: string;
+  draftAttachments?: readonly DraftAttachment[];
   editorRef: React.MutableRefObject<PromptInputEditor | null>;
   effortOptions: readonly TuiEffortOption[];
   effortSelection?: EffortCommandSelectionState;
@@ -319,6 +324,11 @@ export function ComposerInputArea(props: {
       copy: props.copy,
       inputs: props.queuedInputs,
     }),
+    props.draftAttachments?.some((attachment) => attachment.type === "image")
+      ? h(ImageAttachmentBar, {
+          attachments: props.draftAttachments,
+        })
+      : null,
     h(InputPane, {
       busy: props.busy,
       contentWidth: props.contentWidth,

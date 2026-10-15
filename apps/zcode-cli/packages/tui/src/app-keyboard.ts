@@ -79,6 +79,7 @@ type UseTuiKeyboardControlsOptions = {
   modelSelection: ModelCommandSelectionState | undefined;
   modeSelection: ModeCommandSelectionState | undefined;
   onExit: (code: number) => void;
+  openLastDraftImage: () => void;
   pasteClipboardImage: () => Promise<void>;
   recallNextInput: () => Promise<void>;
   recallPreviousInput: () => Promise<void>;
@@ -122,6 +123,7 @@ export function useTuiKeyboardControls({
   modelSelection,
   modeSelection,
   onExit,
+  openLastDraftImage,
   pasteClipboardImage,
   recallNextInput,
   recallPreviousInput,
@@ -441,6 +443,13 @@ export function useTuiKeyboardControls({
         if ((key.name === "v" && (key.ctrl || key.meta)) || key.raw === "\x16") {
           consumeKey(key);
           void pasteClipboardImage();
+          return;
+        }
+
+        if (key.name === "o" && key.ctrl) {
+          consumeKey(key);
+          openLastDraftImage();
+          return;
         }
       },
       [
@@ -463,6 +472,7 @@ export function useTuiKeyboardControls({
         modelSelection,
         modeSelection,
         onExit,
+        openLastDraftImage,
         pasteClipboardImage,
         recallNextInput,
         recallPreviousInput,

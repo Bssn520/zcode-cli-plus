@@ -74,6 +74,28 @@ Current limitations:
 - The clipboard reader snapshots inline data URLs only; it does not persist
   large clipboard media into an attachment artifact store yet.
 
+## ZCP path paste, preview, and open
+
+Fork additions on top of clipboard paste (packages/tui only):
+
+- Bracketed paste whose entire text is one or more existing image paths
+  (quotes, backslash spaces, `file://`, `~`) becomes `[image #N]` draft
+  attachments with inline `data:` URLs. Hard cap: 20MB per file.
+- On submit, `@path` tokens that point at existing image files are upgraded to
+  image attachments (`content=dataUrl`, `type=image`) before
+  `toPromptInput`.
+- Composer shows an attachment bar above the input with filename/`[image #N]`,
+  width×height, size KB, and detected protocol. Protocol selection:
+  `ZCP_IMAGE_PROTOCOL=kitty|iterm|none` override; else
+  `KITTY_WINDOW_ID` / `TERM=xterm-kitty` / `TERM_PROGRAM=ghostty` → kitty;
+  `TERM_PROGRAM=iTerm.app|WezTerm` → iterm; else none. Sixel is out of scope.
+  Kitty/iTerm escape helpers live as pure functions with unit tests; the bar
+  annotates the protocol because OpenTUI cannot emit graphics sequences from
+  text nodes yet.
+- `Ctrl+O` opens the last image attachment in the system viewer via a temp file
+  (`xdg-open` / `open` / Windows `start`), detached. Status and the attachment
+  bar show `Ctrl+O open last image`.
+
 ## UX Contract
 
 - When the normal TUI input is focused and idle, `ctrl+v` attempts to read a
