@@ -40,14 +40,14 @@
     "@zcode/zcode-cua": "workspace:*",
     "cheerio": "^1.0.0",
     "diff": "^9.0.0",
-    "ipaddr.js": "1.9.1",
-    "marked": "16.4.2",
-    "meriyah": "^7.1.1",
-    "unbash": "4.0.1",
-    "yaml": "^2.9.0"
+    "ipaddr.js": "2.5.0",
+    "marked": "18.1.0",
+    "meriyah": "^7.4.0",
+    "unbash": "5.0.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.5",
     "vitest": "^4.1.5"
   }
 }
