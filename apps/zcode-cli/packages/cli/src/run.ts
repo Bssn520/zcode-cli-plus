@@ -35,7 +35,10 @@ import type {
   CliResumeRequest,
   CliTargetRequest,
   RunDependencies,
+  RunPromptHeadlessOptions,
 } from "./cli-types.js";
+import { parseCliModelOption, parseCliTimeoutSeconds } from "./headless-flags.js";
+import { combinePromptWithStdin, readStdinTextIfPiped } from "./stdin-text.js";
 
 export type { RunDependencies } from "./cli-types.js";
 
@@ -56,6 +59,11 @@ const BROWSER_USE_SCOPE_ERROR =
 const SURFACE_SCOPE_ERROR =
   "--surface can only be used with --prompt, --target, app-server, or agent-server.";
 const MEMORY_BENCH_SCOPE_ERROR = "--memory-bench can only be used with -p/--prompt.";
+const NO_SESSION_CONFLICT_ERROR =
+  "--no-session cannot be used with --resume or --continue.";
+const MODEL_SCOPE_ERROR = "--model can only be used with --prompt or --target.";
+const TIMEOUT_SCOPE_ERROR = "--timeout can only be used with --prompt or --target.";
+const NO_SESSION_SCOPE_ERROR = "--no-session can only be used with --prompt or --target.";
 
 const pluginsCommandFlags = (
   values: ReturnType<typeof parseGlobalArgs>["values"],
@@ -387,7 +395,26 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     ctx.stderr.write("--resume and --continue cannot be used together.\n");
     return 1;
   }
+  const noSession = parsed.values["no-session"] === true;
+  if (noSession && (resumeRequest.continueSession || resumeRequest.resumeSessionId)) {
+    ctx.stderr.write(`${NO_SESSION_CONFLICT_ERROR}\n`);
+    return 1;
+  }
 
+  let modelSelection: RunPromptHeadlessOptions["modelSelection"];
+  let timeoutSeconds: number | undefined;
+  try {
+    if (typeof parsed.values.model === "string") {
+      modelSelection = parseCliModelOption(parsed.values.model);
+    }
+    if (typeof parsed.values.timeout === "string") {
+      timeoutSeconds = parseCliTimeoutSeconds(parsed.values.timeout);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    ctx.stderr.write(`${message}\n`);
+    return 1;
+  }
   const env = prepareCliRuntimeEnv(deps.env ?? process.env);
   const detectedLocale = detectCliLocale(env);
   let outputFormat: GlobalOptions["outputFormat"];
@@ -516,10 +543,41 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     },
   };
 
+  const isHeadlessPromptOrTarget =
+    typeof parsed.values.prompt === "string" || targetRequest !== undefined;
+  if (modelSelection && !isHeadlessPromptOrTarget) {
+    ctx.stderr.write(`${MODEL_SCOPE_ERROR}\n`);
+    return 1;
+  }
+  if (timeoutSeconds !== undefined && !isHeadlessPromptOrTarget) {
+    ctx.stderr.write(`${TIMEOUT_SCOPE_ERROR}\n`);
+    return 1;
+  }
+  if (noSession && !isHeadlessPromptOrTarget) {
+    ctx.stderr.write(`${NO_SESSION_SCOPE_ERROR}\n`);
+    return 1;
+  }
+
+  const headlessOptions: RunPromptHeadlessOptions = {
+    ...(modelSelection ? { modelSelection } : {}),
+    ...(noSession ? { noSession: true } : {}),
+    ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+  };
+
   if (typeof parsed.values.prompt === "string") {
+    let promptText = parsed.values.prompt;
+    try {
+      // Only consume stdin when -p/--prompt is present; never for TUI/subcommand paths.
+      const stdinText = await readStdinTextIfPiped(ctx.stdin);
+      promptText = combinePromptWithStdin(promptText, stdinText);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.stderr.write(`Error: ${message}\n`);
+      return 1;
+    }
     return await runPrompt(
       ctx,
-      parsed.values.prompt,
+      promptText,
       parsed.values.attach ?? [],
       options,
       commandDeps,
@@ -530,6 +588,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       forceMcs,
       presentationSurface,
       workflowMode,
+      headlessOptions,
     );
   }
 
@@ -547,6 +606,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       forceMcs,
       presentationSurface,
       workflowMode,
+      headlessOptions,
     );
   }
 

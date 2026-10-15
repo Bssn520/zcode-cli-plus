@@ -23,6 +23,7 @@ import {
   DEFAULT_CLI_CLEANUP_TIMEOUT_MS,
   registerCliShutdownHandlers,
   runCliCleanupWithTimeout,
+  scheduleCliExitWatchdog,
 } from "./shutdown.js";
 import { runSkillsCommand } from "./skills-command.js";
 import {
@@ -38,7 +39,10 @@ import type {
   CliResumeRequest,
   ModeCapableApp,
   RunDependencies,
+  RunPromptHeadlessOptions,
 } from "./cli-types.js";
+import { createTimeoutError, isTimeoutError } from "./headless-flags.js";
+import { createEphemeralSessionStore, type EphemeralSessionStoreHandle } from "./no-session-store.js";
 
 /**
  * Does this run print a JSON summary at the end?
@@ -64,7 +68,6 @@ const MEMORY_BENCH_DISABLED_ERROR =
   "--memory-bench requires Project Memory to be enabled (features.memory=true and memory.use=true).";
 const TARGET_SELECTION_UNAVAILABLE_ERROR =
   "Headless goal commands cannot open an interactive replacement picker. Re-run with --target-replace or use /goal replace <objective>.";
-
 export const runPrompt = async (
   ctx: RunContext,
   prompt: string,
@@ -78,6 +81,7 @@ export const runPrompt = async (
   forceMcs = false,
   presentationSurface: PresentationSurface = "terminal",
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
+  headlessOptions: RunPromptHeadlessOptions = {},
 ): Promise<number> => {
   if (prompt.trim().length === 0) {
     ctx.stderr.write(`${EMPTY_PROMPT_ERROR}\n`);
@@ -148,6 +152,24 @@ export const runPrompt = async (
     1,
     Math.trunc(deps.shutdownCleanupTimeoutMs ?? DEFAULT_CLI_CLEANUP_TIMEOUT_MS),
   );
+  let timedOut = false;
+  let timeoutTimer: NodeJS.Timeout | undefined;
+  let cancelTimeoutWatchdog: (() => void) | undefined;
+  let ephemeralSession: EphemeralSessionStoreHandle | undefined;
+  if (headlessOptions.timeoutSeconds !== undefined) {
+    const timeoutSeconds = headlessOptions.timeoutSeconds;
+    timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      const timeoutError = createTimeoutError(timeoutSeconds);
+      abortController.abort(timeoutError);
+      // Provider retries may ignore abort; force the process out after cleanup budget.
+      cancelTimeoutWatchdog = scheduleCliExitWatchdog({
+        exitCode: 2,
+        exitProcess: deps.exitProcess,
+        timeoutMs: cleanupTimeoutMs + 1_000,
+      });
+    }, timeoutSeconds * 1000);
+  }
   const closeApp = async (): Promise<void> => {
     const targetApp = app;
     closePromise ??= (async () => {
@@ -237,6 +259,9 @@ export const runPrompt = async (
       workingDirectory,
     });
     browserRuntime = createCliHeadlessBrowserRuntime(options, deps);
+    if (headlessOptions.noSession) {
+      ephemeralSession = await createEphemeralSessionStore();
+    }
     app = await createApp({
       browserControlPort: browserRuntime?.browserControlPort,
       env: appEnv,
@@ -253,6 +278,7 @@ export const runPrompt = async (
             providerRuntimeHeadersPort: providerRegistryRuntime.providerRuntimeHeadersPort,
           }
         : {}),
+      ...(ephemeralSession ? { sessionStore: ephemeralSession.store } : {}),
       resume: sessionId !== undefined,
       runtimeConfig: {
         ...(mode ? { mode } : {}),
@@ -260,6 +286,9 @@ export const runPrompt = async (
         ...(forceMcs ? { midConversationSystem: { mode: "force" as const } } : {}),
         ...resolveWorkflowModeRuntimeConfig(workflowMode),
         memory: { extractionEnabled: options.memoryBench === true },
+        ...(headlessOptions.modelSelection
+          ? { modelSelection: headlessOptions.modelSelection }
+          : {}),
         modelStreaming: "on",
         presentationSurface,
         workingDirectory,
@@ -447,6 +476,7 @@ export const runPrompt = async (
     ctx.stdout.write(`${turnResponses.join("\n\n")}\n`);
     return 0;
   } catch (error) {
+    const timeoutHit = timedOut || isTimeoutError(error) || isTimeoutError(abortController.signal.reason);
     const message = error instanceof Error ? error.message : String(error);
     ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
     if (options.verbose) {
@@ -457,11 +487,19 @@ export const runPrompt = async (
         ctx.stderr.write(`${error.stack}\n`);
       }
     }
+    if (timeoutHit) {
+      // Keep the failsafe watchdog until process exit; do not cancel it here.
+      return 2;
+    }
+    cancelTimeoutWatchdog?.();
     return 1;
   } finally {
+    if (timeoutTimer) clearTimeout(timeoutTimer);
+    if (!timedOut) cancelTimeoutWatchdog?.();
     stopObservingEvents();
     unregisterShutdownHandlers();
     await closeApp();
+    await ephemeralSession?.dispose();
   }
 };
 

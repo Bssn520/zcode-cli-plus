@@ -42,6 +42,11 @@ Options:
   --force-mcs      Force mid-conversation system projection for Anthropic providers
   --locale <locale>  UI locale: en-US, zh-CN, or auto
   --mode <mode>    Permission mode for prompts: build, edit, plan, yolo, or guarded (default: yolo for --prompt)
+  --model <provider/model>  Override the model for this --prompt/--target run only
+  --timeout <seconds>  Abort the headless run after N seconds (exit 2); recommended for scripts
+  --no-session     Use a temporary session DB and delete it when the run ends
+  --output-format <text|json|stream-json>  Headless output shape (default: text; --json still works)
+  Piped non-TTY stdin with -p/--prompt <text> is prepended as "stdin\\n\\nprompt" (max 10MB). Bare -p still requires a value.
   --resume <sessionId>  Resume a persisted session by sessionId (sess_...)
   --target <text>  Run or set the session goal in headless mode
   --target-replace Replace any existing session goal set by --target

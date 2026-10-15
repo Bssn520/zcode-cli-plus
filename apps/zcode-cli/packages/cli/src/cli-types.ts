@@ -142,3 +142,9 @@ export interface CliResumeRequest {
   continueSession: boolean;
   resumeSessionId?: string;
 }
+
+export interface RunPromptHeadlessOptions {
+  modelSelection?: { providerId: string; modelId: string };
+  noSession?: boolean;
+  timeoutSeconds?: number;
+}
