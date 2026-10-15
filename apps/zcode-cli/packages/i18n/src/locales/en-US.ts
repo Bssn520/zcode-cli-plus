@@ -324,8 +324,10 @@ Slash Commands:
       tools: {
         answered: (summary) => `· Answered: ${summary}`,
         bash: (command) => `run ${command}`,
+        collapsedStatus: "Tool details collapsed. Ctrl+E to expand.",
         edit: (path) => `edit ${path}`,
         exitCode: (code) => `exit code ${code}`,
+        expandedStatus: "Tool details expanded. Ctrl+E to collapse.",
         failMark: "✗",
         generic: (name) => name,
         glob: (pattern) => `glob ${pattern}`,

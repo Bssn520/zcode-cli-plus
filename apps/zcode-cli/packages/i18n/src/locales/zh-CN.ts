@@ -321,8 +321,10 @@ Slash Commands:
       tools: {
         answered: (summary) => `· 已回答：${summary}`,
         bash: (command) => `运行 ${command}`,
+        collapsedStatus: "已收起工具详情。Ctrl+E 展开。",
         edit: (path) => `修改 ${path}`,
         exitCode: (code) => `退出码 ${code}`,
+        expandedStatus: "已展开工具详情。Ctrl+E 收起。",
         failMark: "✗",
         generic: (name) => name,
         glob: (pattern) => `匹配 ${pattern}`,

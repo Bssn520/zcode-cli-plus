@@ -256,8 +256,10 @@ export interface TuiCopy {
     tools: {
       answered(summary: string): string;
       bash(command: string): string;
+      collapsedStatus: string;
       edit(path: string): string;
       exitCode(code: number): string;
+      expandedStatus: string;
       failMark: string;
       generic(name: string): string;
       glob(pattern: string): string;

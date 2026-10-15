@@ -4,6 +4,10 @@ import type { ToolResultDisplayLine, ToolTranscriptPart } from "./app-model.js";
 import { ShikiDiffView, diffViewForWidth } from "./app-shiki-diff-view.js";
 import { DEFAULT_TUI_COPY } from "./app-locale.js";
 import { palette } from "./app-model.js";
+import {
+  getToolSummariesExpanded,
+  subscribeToolSummariesExpanded,
+} from "./app-tool-expansion.js";
 import { presentToolTranscriptPart } from "./app-tool-summary.js";
 import { truncateDisplay } from "./app-terminal-width.js";
 import { activeTuiTheme } from "./theme/index.js";
@@ -55,7 +59,8 @@ function ToolSummaryStateful({
   summary: string;
   terminalWidth: number;
 }): React.ReactElement {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(getToolSummariesExpanded);
+  React.useEffect(() => subscribeToolSummariesExpanded(setExpanded), []);
   return h(ToolTranscriptPartFrame, {
     expanded,
     onToggle: () => setExpanded((current) => !current),

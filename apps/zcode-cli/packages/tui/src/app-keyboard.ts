@@ -1,4 +1,5 @@
 import { decodePasteBytes, type KeyEvent } from "@mbears/opentui-core";
+import { getZCodeCopy } from "@zcode/i18n";
 import type { TuiWorkflowExpansionControls } from "./app-workflow-controller.js";
 import { useKeyboard, usePaste } from "@mbears/opentui-react";
 import { useCallback, useRef } from "react";
@@ -22,6 +23,12 @@ import {
   shouldHandleInputHistoryNavigation,
   workflowExpansionActionFor,
 } from "./app-keyboard-helpers.js";
+import { DEFAULT_TUI_COPY } from "./app-locale.js";
+import {
+  messagesHaveWorkToolSummaries,
+  toolExpansionActionFor,
+  toggleAllToolSummaries,
+} from "./app-tool-expansion.js";
 import { handleSuggestionNavigationKey } from "./app-keyboard-suggestions.js";
 import { createSidebarShortcutState, type SidebarShortcutState } from "./app-sidebar-shortcut.js";
 import { handleSidebarShortcutKey } from "./app-sidebar-keyboard.js";
@@ -429,6 +436,23 @@ export function useTuiKeyboardControls({
           consumeKey(key);
           if (workflowExpansionKey === "expand") workflowExpansion.expandAll();
           else workflowExpansion.collapseAll();
+          return;
+        }
+
+        // Ctrl+E toggles all work-tool summaries; claimed only on an empty draft
+        // so OpenTUI textarea keeps line-end while the user is editing.
+        if (
+          toolExpansionActionFor({
+            key,
+            draftValue,
+            hasSummaries: messagesHaveWorkToolSummaries(messages),
+          })
+        ) {
+          consumeKey(key);
+          const expanded = toggleAllToolSummaries();
+          const toolsCopy = (locale ? getZCodeCopy(locale).tui : DEFAULT_TUI_COPY).transcript
+            .tools;
+          setStatus(expanded ? toolsCopy.expandedStatus : toolsCopy.collapsedStatus);
           return;
         }
 
