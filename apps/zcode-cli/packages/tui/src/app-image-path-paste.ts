@@ -96,9 +96,10 @@ async function attachImagePaths(
       placeholder,
     });
     options.setDraftAttachments((current) => [...current, attachment]);
-    if (!insertPlaceholderIntoEditor(options.inputEditorRef.current, placeholder)) {
-      options.setDraftValue(appendedImagePlaceholder(options.getDraftValue(), placeholder));
-    }
+    const next =
+      insertPlaceholderIntoEditor(options.inputEditorRef.current, placeholder) ??
+      appendedImagePlaceholder(options.getDraftValue(), placeholder);
+    options.setDraftValue(next);
     attached.push(placeholder);
   }
 
@@ -123,9 +124,10 @@ function appendedImagePlaceholder(draft: string, placeholder: string): string {
 function insertPlaceholderIntoEditor(
   editor: PromptInputEditor | null,
   placeholder: string,
-): boolean {
-  if (!editor) return false;
-  editor.setText(appendedImagePlaceholder(editor.plainText, placeholder));
+): string | undefined {
+  if (!editor) return undefined;
+  const next = appendedImagePlaceholder(editor.plainText, placeholder);
+  editor.setText(next);
   editor.gotoBufferEnd();
-  return true;
+  return next;
 }

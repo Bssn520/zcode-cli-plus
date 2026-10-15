@@ -128,7 +128,6 @@ export type QuestionPromptState = {
   multiSelections: Record<string, string[]>;
   otherBuffer: string;
   otherText: Record<string, string>;
-  reviewing: boolean;
   selectedOptionIndex: number;
 };
 
