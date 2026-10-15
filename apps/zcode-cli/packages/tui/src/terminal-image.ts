@@ -65,7 +65,7 @@ export function formatImageAttachmentFallback(input: {
   return parts.join("  ");
 }
 
-/** Kitty graphics protocol: transmit PNG/JPEG payload as base64. */
+/** Kitty graphics protocol: transmit+display PNG/JPEG payload as base64 (a=T). */
 export function encodeKittyImage(input: {
   base64: string;
   /** Display width in terminal columns. */
@@ -73,6 +73,75 @@ export function encodeKittyImage(input: {
   height?: number;
   mediaType?: string;
   /** Display height in terminal rows. */
+  rows?: number;
+  width?: number;
+}): string {
+  return encodeKittyChunks({
+    action: "T",
+    base64: input.base64,
+    columns: input.columns,
+    height: input.height,
+    mediaType: input.mediaType,
+    rows: input.rows,
+    width: input.width,
+  });
+}
+
+/** Transmit-only (`a=t`); pair with {@link encodeKittyPlace}. Quiet (`q=2`). */
+export function encodeKittyTransmit(input: {
+  base64: string;
+  id: number;
+  mediaType?: string;
+}): string {
+  return encodeKittyChunks({
+    action: "t",
+    base64: input.base64,
+    id: input.id,
+    mediaType: input.mediaType,
+    quiet: 2,
+  });
+}
+
+/** Place a previously transmitted image (`a=p`). `C=1` keeps the cursor put. */
+export function encodeKittyPlace(input: {
+  columns?: number;
+  id: number;
+  placementId?: number;
+  rows?: number;
+}): string {
+  const parts = [
+    "a=p",
+    `i=${input.id}`,
+    `p=${input.placementId ?? input.id}`,
+    input.columns ? `c=${input.columns}` : undefined,
+    input.rows ? `r=${input.rows}` : undefined,
+    "C=1",
+    "q=2",
+  ].filter(Boolean);
+  return `\x1b_G${parts.join(",")}\x1b\\`;
+}
+
+/** Delete one placement only (`d=i`); image data stays cached. */
+export function encodeKittyDeletePlacement(input: {
+  id: number;
+  placementId?: number;
+}): string {
+  return `\x1b_Ga=d,d=i,i=${input.id},p=${input.placementId ?? input.id}\x1b\\`;
+}
+
+/** Free transmitted image data (`d=I`). */
+export function encodeKittyDeleteImage(id: number): string {
+  return `\x1b_Ga=d,d=I,i=${id}\x1b\\`;
+}
+
+function encodeKittyChunks(input: {
+  action: "T" | "t";
+  base64: string;
+  columns?: number;
+  height?: number;
+  id?: number;
+  mediaType?: string;
+  quiet?: number;
   rows?: number;
   width?: number;
 }): string {
@@ -85,12 +154,14 @@ export function encodeKittyImage(input: {
     const more = offset + chunkSize < payload.length ? 1 : 0;
     if (offset === 0) {
       const sizeParts = [
-        `a=T`,
+        `a=${input.action}`,
+        input.id !== undefined ? `i=${input.id}` : undefined,
         `f=${format}`,
         input.width ? `s=${input.width}` : undefined,
         input.height ? `v=${input.height}` : undefined,
         input.columns ? `c=${input.columns}` : undefined,
         input.rows ? `r=${input.rows}` : undefined,
+        input.quiet !== undefined ? `q=${input.quiet}` : undefined,
         `m=${more}`,
       ].filter(Boolean);
       chunks.push(`\x1b_G${sizeParts.join(",")};${slice}\x1b\\`);

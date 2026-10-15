@@ -156,3 +156,84 @@ test("an unknown --output-format is rejected instead of falling back to text", a
   assert.match(ctx.stderr.output(), /--output-format must be one of/);
   assert.equal(ctx.stdout.output(), "");
 });
+
+test("json output writes model failures as a result error object on stdout", async () => {
+  const ctx = createContext(["--output-format", "json", "--prompt", "hi"]);
+  const code = await run(ctx, {
+    ...createDeps(),
+    createZCodeApp: () => {
+      throw new Error("No model is configured.");
+    },
+  });
+  assert.equal(code, 1);
+  const parsed = JSON.parse(ctx.stdout.output()) as {
+    type: string;
+    subtype: string;
+    is_error: boolean;
+    error: string;
+  };
+  assert.equal(parsed.type, "result");
+  assert.equal(parsed.subtype, "error");
+  assert.equal(parsed.is_error, true);
+  assert.equal(parsed.error, "No model is configured.");
+  assert.equal(ctx.stderr.output().includes("No model is configured."), false);
+});
+
+test("stream-json output writes model failures as one JSON line on stdout", async () => {
+  const ctx = createContext(["--output-format", "stream-json", "--prompt", "hi"]);
+  const code = await run(ctx, {
+    ...createDeps(),
+    createZCodeApp: () => {
+      throw new Error("No model is configured.");
+    },
+  });
+  assert.equal(code, 1);
+  const lines = ctx.stdout.output().trim().split("\n");
+  assert.equal(lines.length, 1);
+  const parsed = JSON.parse(lines[0] ?? "") as {
+    type: string;
+    subtype: string;
+    is_error: boolean;
+    error: string;
+  };
+  assert.equal(parsed.type, "result");
+  assert.equal(parsed.subtype, "error");
+  assert.equal(parsed.is_error, true);
+  assert.equal(parsed.error, "No model is configured.");
+});
+
+test("text output keeps model failures on stderr", async () => {
+  const ctx = createContext(["--prompt", "hi"]);
+  const code = await run(ctx, {
+    ...createDeps(),
+    createZCodeApp: () => {
+      throw new Error("No model is configured.");
+    },
+  });
+  assert.equal(code, 1);
+  assert.equal(ctx.stdout.output(), "");
+  assert.match(ctx.stderr.output(), /Error: No model is configured\./);
+});
+
+test("invalid --model with json output writes the error object on stdout", async () => {
+  const ctx = createContext([
+    "--output-format",
+    "json",
+    "--prompt",
+    "hi",
+    "--model",
+    "not-a-provider-model",
+  ]);
+  const code = await run(ctx, createDeps());
+  assert.equal(code, 1);
+  const parsed = JSON.parse(ctx.stdout.output()) as {
+    type: string;
+    subtype: string;
+    is_error: boolean;
+    error: string;
+  };
+  assert.equal(parsed.type, "result");
+  assert.equal(parsed.subtype, "error");
+  assert.equal(parsed.is_error, true);
+  assert.match(parsed.error, /--model must be <provider\/model>/);
+});

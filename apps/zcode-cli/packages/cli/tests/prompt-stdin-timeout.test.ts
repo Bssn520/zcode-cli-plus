@@ -430,6 +430,43 @@ test("--no-session injects a temp sessionStore and cleans it up", async () => {
   }
 });
 
+test("--no-session sets ZCODE_DISABLE_MODEL_IO_RECORD before createApp", async () => {
+  const previous = process.env.ZCODE_DISABLE_MODEL_IO_RECORD;
+  delete process.env.ZCODE_DISABLE_MODEL_IO_RECORD;
+  let seenEnv: string | undefined;
+
+  try {
+    const ctx = createContext(["--prompt", "hi", "--no-session", "--json"]);
+    const code = await run(
+      ctx,
+      createPromptDeps({
+        createZCodeApp: (options) => {
+          seenEnv = (options?.env as NodeJS.ProcessEnv | undefined)?.ZCODE_DISABLE_MODEL_IO_RECORD;
+          assert.equal(process.env.ZCODE_DISABLE_MODEL_IO_RECORD, "1");
+          return {
+            sessionId: "session-ephemeral",
+            traceId: "trace-test",
+            runtime: {} as never,
+            close: async () => undefined,
+            submitPrompt: async () => ({
+              events: [],
+              projection: fakeProjection as never,
+              response: "hi",
+              traceId: "trace-test" as never,
+              turnId: "turn-test" as never,
+            }),
+          } as never;
+        },
+      }),
+    );
+    assert.equal(code, 0);
+    assert.equal(seenEnv, "1");
+  } finally {
+    if (previous === undefined) delete process.env.ZCODE_DISABLE_MODEL_IO_RECORD;
+    else process.env.ZCODE_DISABLE_MODEL_IO_RECORD = previous;
+  }
+});
+
 test("cleanupStaleNoSessionStores removes old temp DBs", async () => {
   const root = await mkdtemp(join(tmpdir(), "zcp-nosession-sweep-"));
   const stale = join(root, `${NO_SESSION_TEMP_PREFIX}old.sqlite`);
