@@ -5,6 +5,8 @@ import { AppView } from "./app-view.js";
 import type { PromptInputEditor } from "./app-input-pane.js";
 import { selectionCopyStatus, type SelectionCopyResult } from "./app-copy.js";
 import { useClipboardImagePaste } from "./app-clipboard-image.js";
+import { useImagePathPaste, OPEN_IMAGE_SHORTCUT_HINT } from "./app-image-path-paste.js";
+import { openLastImageAttachment } from "./app-image-files.js";
 import { useFileMentionController } from "./app-file-mentions.js";
 import { useTuiKeyboardControls } from "./app-keyboard.js";
 import { useTuiModeSwitcher } from "./app-mode.js";
@@ -68,7 +70,7 @@ export function TuiApp({
       : [],
   );
   const [draft, setDraftState] = useState("");
-  const [, setDraftAttachmentsState] = useState<DraftAttachment[]>([]);
+  const [draftAttachments, setDraftAttachmentsState] = useState<DraftAttachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState(initialResult?.mode ?? options.initialMode ?? "build");
   const [model, setModel] = useState(initialResult?.model ?? options.initialModel ?? "unknown");
@@ -290,6 +292,28 @@ export function TuiApp({
     setStatusDetails,
   });
 
+  useImagePathPaste({
+    busy,
+    cwd: options.workspaceDirectory,
+    getDraftValue: () => draftRef.current,
+    inputEditorRef,
+    nextAttachmentIdRef,
+    setDraftAttachments,
+    setDraftValue,
+    setStatus,
+    setStatusDetails,
+  });
+
+  const openLastDraftImage = useCallback(() => {
+    void openLastImageAttachment(draftAttachmentsRef.current).then((result) => {
+      if (result.ok) {
+        setStatus(`Opened image in system viewer. ${OPEN_IMAGE_SHORTCUT_HINT}`);
+        return;
+      }
+      setStatus(result.message);
+    });
+  }, []);
+
   const { recallNextInput, recallPreviousInput } = useInputHistory({
     copy: copy.tui,
     draftAttachmentsRef,
@@ -350,6 +374,7 @@ export function TuiApp({
     handleFileMentionKey: fileMentions.handleKey,
     onExit,
     pasteClipboardImage,
+    openLastDraftImage,
     recallNextInput,
     recallPreviousInput,
     draftValue: draft,
@@ -390,6 +415,7 @@ export function TuiApp({
     copy: copy.tui,
     copyCurrentSelection,
     draft,
+    draftAttachments,
     editorRef: inputEditorRef,
     inputCursorToEndVersion,
     lastError,

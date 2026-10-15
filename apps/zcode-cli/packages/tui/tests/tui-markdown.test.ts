@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MessageRow } from "../src/app-transcript-components.js";
 import { palette } from "../src/app-model.js";
-import { detectMarkdownRenderMode, MarkdownText } from "../src/app-markdown.js";
-import { markdownSyntaxRules } from "../src/app-markdown-theme.js";
+import {
+  createShikiOnChunks,
+  detectMarkdownRenderMode,
+  MarkdownText,
+} from "../src/app-markdown.js";
+import { createMarkdownSyntaxStyle, markdownSyntaxRules } from "../src/app-markdown-theme.js";
+import { resetShikiHighlighterForTest } from "../src/app-shiki-highlighter.js";
 import { DARK_TUI_THEME } from "../src/theme/index.js";
 
 test("detects the best available markdown render mode", () => {
@@ -40,6 +45,56 @@ test("uses OpenTUI native markdown when available", () => {
   assert.equal(node.props.streaming, true);
   assert.ok(node.props.syntaxStyle);
 });
+
+test("passes tableOptions through to native markdown", () => {
+  const tableOptions = { style: "grid" as const, wrapMode: "word" as const };
+  const node = MarkdownText({
+    content: "| a | b |\n| --- | --- |\n| 1 | 2 |",
+    mode: "markdown",
+    tableOptions,
+  });
+
+  assert.equal(node.type, "markdown");
+  assert.equal(node.props.tableOptions, tableOptions);
+  assert.equal(typeof node.props.renderNode, "function");
+});
+
+test("reuses stable renderNode and syntaxStyle across renders", () => {
+  const first = MarkdownText({
+    content: "```ts\n const x = 1\n```",
+    mode: "markdown",
+  });
+  const second = MarkdownText({
+    content: "```ts\n const y = 2\n```",
+    mode: "markdown",
+  });
+  assert.equal(first.type, "markdown");
+  assert.equal(second.type, "markdown");
+  assert.equal(first.props.renderNode, second.props.renderNode);
+  assert.equal(first.props.syntaxStyle, second.props.syntaxStyle);
+});
+
+test("shiki onChunks returns foreground-colored ts keyword chunks", async () => {
+  resetShikiHighlighterForTest();
+  const source = 'export function demo() {\n  const msg = "hi";\n  return msg;\n}\n';
+  const syntaxStyle = createMarkdownSyntaxStyle(DARK_TUI_THEME);
+  assert.ok(syntaxStyle);
+  const onChunks = createShikiOnChunks("dark", "ts", "#e5e7eb");
+  const result = await onChunks([], {
+    content: source,
+    filetype: "typescript",
+    highlights: [],
+    syntaxStyle,
+  });
+  assert.ok(result && result.length > 1);
+  const colored = result.filter(
+    (chunk) => chunk.fg && /export|function|const|return|"hi"/u.test(chunk.text),
+  );
+  assert.ok(colored.length >= 4, `expected colored keyword/string chunks, got ${colored.length}`);
+  const colors = new Set(colored.map((chunk) => JSON.stringify(chunk.fg)));
+  assert.ok(colors.size > 1, "expected more than one foreground color from shiki");
+});
+
 
 test("passes underscore-delimited text through to native markdown unchanged", () => {
   const sessionId = "sess_workflow_activity_26c91a65-2d5a-4f7b-9954-3ff7dbe92771";

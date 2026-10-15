@@ -101,7 +101,12 @@ native output in the TUI.
 
 Unsupported markdown constructs should degrade predictably:
 
-- tables render as wrapped plain markdown rows unless OpenTUI handles them well;
+- tables render with OpenTUI native `TextTable` (plan preview passes
+  `tableOptions: { style: "grid", wrapMode: "word" }`); if table rendering
+  fails, fall back to the source markdown rows;
+- fenced code blocks prefer shiki highlighting via `MarkdownText` `renderNode`
+  + `CodeRenderable.onChunks`, with tree-sitter/plain fallback on timeout or
+  unknown languages;
 - images render as link-like alt text plus URL when available;
 - raw HTML is escaped or shown as plain text;
 - broken or unfinished fences during streaming remain visible and must not throw.
@@ -138,7 +143,8 @@ up:
   - `MarkdownText` component.
   - Capability-based choice between native `markdown`,
     `code filetype="markdown"`, and plain `text`.
-  - Props: `content`, `streaming`, `tone`, `backgroundColor`, `foregroundColor`.
+  - Props: `content`, `streaming`, `tone`, `backgroundColor`, `foregroundColor`,
+    optional `tableOptions`, and shiki fence `renderNode` wiring.
 - `packages/tui/src/app-markdown-theme.ts`
   - Theme-to-markdown/syntax style mapping.
   - No external I/O.
@@ -254,8 +260,12 @@ assert that every supported target includes the required files.
 
 - Reuse the same markdown component for `AskUserQuestion` markdown preview and
   other opt-in TUI preview fields.
-- Keep HTML preview out of scope unless a separate sandboxed preview spec is
-  written.
+- Plan approval preview reuses `MarkdownText` (tables + shiki fences). Preview
+  height prefers measured scrollbox content height (with a table-aware estimate
+  fallback). `PgUp`/`PgDn` scroll the preview; `o` opens Mermaid fences in the
+  system browser via a vendored offline `mermaid.min.js` (no CDN).
+- Keep arbitrary HTML preview out of scope; Mermaid is the only intentional
+  external HTML surface and must stay offline-capable.
 
 ## Tests
 

@@ -187,6 +187,15 @@ await cp(tuiDist, resolve(out, "dist", tuiRuntimeDirName), {
   recursive: true,
   filter: (src) => !src.endsWith(".map") && !src.endsWith(".d.ts"),
 });
+const mermaidMinJs = resolve(root, "node_modules/mermaid/dist/mermaid.min.js");
+await stat(mermaidMinJs).catch(() => {
+  throw new Error(
+    `missing ${mermaidMinJs}; install mermaid in @zcode/tui (devDependency) before preparing the npm package`,
+  );
+});
+const mermaidVendorDir = resolve(out, "dist", tuiRuntimeDirName, "vendor");
+await mkdir(mermaidVendorDir, { recursive: true });
+await cp(mermaidMinJs, resolve(mermaidVendorDir, "mermaid.min.js"));
 for (const file of ROOT_FILES) await cp(resolve(root, file), resolve(out, file));
 const pkg = JSON.parse(await readFile(resolve(root, "npm/package.json"), "utf8"));
 const binNames = Object.keys(pkg.bin ?? {});

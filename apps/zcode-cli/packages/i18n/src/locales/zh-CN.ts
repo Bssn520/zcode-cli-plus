@@ -42,6 +42,11 @@ export const zhCN: ZCodeCopy = {
   --force-mcs      对 Anthropic provider 强制启用 mid-conversation system 投影
   --locale <locale>  UI 语言：en-US、zh-CN 或 auto
   --mode <mode>    prompt 权限模式：build、edit、plan、yolo 或 guarded（--prompt 默认 yolo）
+  --model <provider/model>  仅覆盖本次 --prompt/--target 的模型选择
+  --timeout <seconds>  无头运行超过 N 秒后中止（退出码 2）；脚本场景建议始终带上
+  --no-session     使用临时 session DB，运行结束后删除
+  --output-format <text|json|stream-json>  无头输出形态（默认 text；--json 仍可用）
+  非 TTY 的 stdin 与 -p/--prompt <text> 合用时，会前置拼成 "stdin\\n\\nprompt"（上限 10MB）。裸 -p 仍需要参数值。
   --resume <sessionId>  按 sessionId 恢复持久化 session（sess_...）
   --target <text>  在 headless 模式运行或设置 session goal
   --target-replace 替换 --target 已存在的 goal
@@ -372,7 +377,14 @@ Slash Commands:
       noteMarker: "备注",
       stepCount: (count) => `${count} 个步骤`,
       commentCount: (count) => `${count} 条意见`,
-      help: "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
+      help: (commentCount) =>
+        commentCount > 0
+          ? `Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 发送意见（${commentCount} 条） · Esc 取消 · j/k 选择 · PgUp/PgDn 滚动预览 · o 打开 Mermaid`
+          : "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择 · PgUp/PgDn 滚动预览 · o 打开 Mermaid",
+      mermaidHint: "含 Mermaid：按 o 在浏览器查看",
+      mermaidNone: "当前计划没有 Mermaid 代码块",
+      mermaidOpenFailed: (message) => `无法打开 Mermaid 预览：${message}`,
+      mermaidOpened: "已在浏览器中打开 Mermaid 预览",
       commentStepTitle: (index) => `步骤 ${index} 的意见`,
       commentOverallTitle: "整体计划意见",
       commentHelp: "Enter 挂上 · Esc 返回",
@@ -382,6 +394,7 @@ Slash Commands:
       overallCommentSummary: (text) => `[整体] ${text}`,
       editorNotFound: "未找到编辑器：请设置 $VISUAL 或 $EDITOR",
       editorFailed: (message) => `无法打开编辑器：${message}`,
+      feedbackModifiedPlan: (plan) => `用户已修改计划，修改后的计划如下：\n${plan}`,
     },
   },
 };

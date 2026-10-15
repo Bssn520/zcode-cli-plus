@@ -9,8 +9,15 @@ import {
   normalizePlanText,
   type SuspendTerminal,
 } from "./app-plan-editor.js";
+import {
+  activePlanPreviewPageSize,
+  scrollActivePlanPreview,
+} from "./app-plan-preview-scroll.js";
+import {
+  openMermaidPreviewInBrowser,
+  type MermaidPreviewOpenResult,
+} from "./app-mermaid-preview.js";
 import { parsePlanPreview } from "./app-plan-parse.js";
-
 let nextCommentId = 1;
 
 export function createPlanApprovalState(plan: string): PlanApprovalState {
@@ -81,6 +88,11 @@ export function handlePlanApprovalKey(
   options?: {
     editPlan?: typeof editPlanInExternalEditor;
     locale?: SupportedLocale;
+    openMermaidPreview?: (
+      markdown: string,
+    ) => MermaidPreviewOpenResult | Promise<MermaidPreviewOpenResult>;
+    previewPageSize?: number;
+    scrollPlanPreview?: (deltaY: number) => void;
     suspendTerminal?: SuspendTerminal;
   },
 ): void {
@@ -107,7 +119,7 @@ export function handlePlanApprovalKey(
     return;
   }
   if (state.mode === "review") {
-    handleReviewKey(key, approval, state, update, setApprovalQueue, setStatus);
+    handleReviewKey(key, approval, state, update, setApprovalQueue, setStatus, options?.locale);
     return;
   }
 
@@ -121,6 +133,11 @@ export function handlePlanApprovalKey(
   }
 
   if (key.name === "return") {
+    // 有评论时 Enter 应发送反馈，不能静默批准丢掉评论文本。
+    if (state.comments.length > 0) {
+      sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus, options?.locale);
+      return;
+    }
     resolvePlanApproval(
       approval,
       setApprovalQueue,
@@ -181,6 +198,14 @@ export function handlePlanApprovalKey(
 
   const character = printableKey(key)?.toLowerCase();
   const steps = parsePlanPreview(state.draftPlan).steps;
+  const planCopy = getZCodeCopy(options?.locale ?? "en-US").tui.planApproval;
+
+  if (key.name === "pageup" || key.name === "pagedown") {
+    const pageSize = Math.max(1, options?.previewPageSize ?? activePlanPreviewPageSize());
+    const delta = key.name === "pageup" ? -pageSize : pageSize;
+    (options?.scrollPlanPreview ?? scrollActivePlanPreview)(delta);
+    return;
+  }
 
   if (key.name === "up" || character === "k") {
     if (steps.length === 0) return;
@@ -222,6 +247,33 @@ export function handlePlanApprovalKey(
       draft.commentTarget = { kind: "overall" };
     });
     setStatus("Type overall plan feedback. Enter attaches, Esc cancels.");
+    return;
+  }
+
+  if (!key.shift && character === "o") {
+    void Promise.resolve(
+      (options?.openMermaidPreview ?? openMermaidPreviewInBrowser)(state.draftPlan),
+    ).then((result) => {
+      if (result.kind === "none") {
+        update((draft) => {
+          draft.statusMessage = planCopy.mermaidNone;
+        });
+        setStatus(planCopy.mermaidNone);
+        return;
+      }
+      if (result.kind === "failed") {
+        const message = planCopy.mermaidOpenFailed(result.message);
+        update((draft) => {
+          draft.statusMessage = message;
+        });
+        setStatus(message);
+        return;
+      }
+      update((draft) => {
+        draft.statusMessage = planCopy.mermaidOpened;
+      });
+      setStatus(planCopy.mermaidOpened);
+    });
     return;
   }
 
@@ -335,6 +387,7 @@ function handleReviewKey(
   update: (recipe: (draft: PlanApprovalState) => void) => void,
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
   setStatus: (status: string) => void,
+  locale?: SupportedLocale,
 ): void {
   if (key.name === "escape") {
     update((draft) => {
@@ -349,13 +402,7 @@ function handleReviewKey(
       setStatus("No comments to send.");
       return;
     }
-    resolvePlanApproval(approval, setApprovalQueue, setStatus, {
-      decision: "deny",
-      preserveReasonFormatting: true,
-      reason: composePlanFeedbackReason(state.comments),
-      reasonSource: "plan_approval_feedback",
-      resolvedAt: new Date(),
-    });
+    sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus, locale);
     return;
   }
 
@@ -389,6 +436,30 @@ function handleReviewKey(
     });
     setStatus("Comment deleted.");
   }
+}
+
+function sendPlanApprovalFeedback(
+  approval: ApprovalPrompt,
+  state: PlanApprovalState,
+  setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
+  setStatus: (status: string) => void,
+  locale?: SupportedLocale,
+): void {
+  let reason = composePlanFeedbackReason(state.comments);
+  // 反馈走 deny，编辑后的计划不会进 modifiedInput；有改动时塞进 reason，避免丢失。
+  if (isPlanDraftModified(state)) {
+    const appendix = getZCodeCopy(locale ?? "en-US").tui.planApproval.feedbackModifiedPlan(
+      state.draftPlan,
+    );
+    reason = `${reason}\n\n${appendix}`;
+  }
+  resolvePlanApproval(approval, setApprovalQueue, setStatus, {
+    decision: "deny",
+    preserveReasonFormatting: true,
+    reason,
+    reasonSource: "plan_approval_feedback",
+    resolvedAt: new Date(),
+  });
 }
 
 function resolvePlanApproval(

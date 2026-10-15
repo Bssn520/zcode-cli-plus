@@ -26,6 +26,24 @@ const LANGUAGE_BY_EXTENSION: Record<string, BundledLanguage> = {
   swift: "swift",
 };
 
+const LANGUAGE_BY_INFOSTRING: Record<string, BundledLanguage> = {
+  bash: "bash",
+  cjs: "javascript",
+  cts: "typescript",
+  js: "javascript",
+  jsx: "jsx",
+  md: "markdown",
+  mjs: "javascript",
+  mts: "typescript",
+  py: "python",
+  rs: "rust",
+  sh: "shell",
+  shell: "shell",
+  ts: "typescript",
+  tsx: "tsx",
+  yml: "yaml",
+  zsh: "bash",
+};
 export type ShikiHighlightSegment = {
   color?: string;
   fontStyle?: number;
@@ -50,12 +68,27 @@ export function inferShikiLanguage(filePath: string | undefined): BundledLanguag
   return isBundledLanguage(mapped) ? mapped : undefined;
 }
 
+export function resolveShikiLanguageFromInfoString(
+  infoString: string | undefined,
+): BundledLanguage | undefined {
+  if (!infoString) return undefined;
+  const token = infoString.trim().split(/\s+/u, 1)[0]?.toLowerCase();
+  if (!token) return undefined;
+  const mapped = LANGUAGE_BY_INFOSTRING[token] ?? token;
+  return isBundledLanguage(mapped) ? mapped : undefined;
+}
+
 export async function highlightShikiCodeLines(input: {
-  filePath: string | undefined;
+  filePath?: string;
+  infoString?: string;
+  language?: BundledLanguage;
   lines: string[];
   mode: TuiThemeMode;
 }): Promise<ShikiHighlightSegment[][] | undefined> {
-  const language = inferShikiLanguage(input.filePath);
+  const language =
+    input.language ??
+    resolveShikiLanguageFromInfoString(input.infoString) ??
+    inferShikiLanguage(input.filePath);
   if (!language) return undefined;
 
   const theme = shikiThemeForMode(input.mode);

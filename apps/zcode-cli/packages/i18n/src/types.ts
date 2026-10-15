@@ -316,7 +316,11 @@ export interface TuiCopy {
     noteMarker: string;
     stepCount(count: number): string;
     commentCount(count: number): string;
-    help: string;
+    help(commentCount: number): string;
+    mermaidHint: string;
+    mermaidNone: string;
+    mermaidOpenFailed(message: string): string;
+    mermaidOpened: string;
     commentStepTitle(index: number): string;
     commentOverallTitle: string;
     commentHelp: string;
@@ -326,5 +330,6 @@ export interface TuiCopy {
     overallCommentSummary(text: string): string;
     editorNotFound: string;
     editorFailed(message: string): string;
+    feedbackModifiedPlan(plan: string): string;
   };
 }

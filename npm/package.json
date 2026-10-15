@@ -1,6 +1,6 @@
 {
   "name": "@bssn520/zcode-cli-plus",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Community-maintained, unofficial fork of the ZCode CLI (zai-org/ZCode). Not an official Z.AI product.",
   "license": "Apache-2.0",
   "repository": {

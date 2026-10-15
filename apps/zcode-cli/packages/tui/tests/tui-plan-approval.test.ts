@@ -4,7 +4,9 @@ import type { KeyEvent } from "@mbears/opentui-core";
 import type { PermissionBrokerRequest, PermissionBrokerResult } from "@zcode/contracts";
 import { PlanApprovalPanel, PlanApprovalPanelView } from "../src/app-plan-approval-panel.js";
 import { wrapPlanApprovalHints } from "../src/app-plan-approval-hints.js";
+import { getZCodeCopy } from "@zcode/i18n";
 import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
+import { MarkdownText } from "../src/app-markdown.js";
 import { testRender } from "@mbears/opentui-react/test-utils";
 import React, { act } from "react";
 import type { ApprovalPrompt } from "../src/app-model.js";
@@ -131,6 +133,117 @@ test("accumulates step and overall comments then sends feedback", () => {
   assert.match(harness.result?.reason ?? "", /\[step 2\].*need coverage/u);
   assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
 });
+test("Enter with comments sends plan_approval_feedback without opening review", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  harness.press("f");
+  for (const ch of "need coverage") harness.press(ch);
+  harness.press("return");
+  harness.press("g");
+  for (const ch of "prefer smaller PR") harness.press(ch);
+  harness.press("return");
+  assert.equal(harness.state.mode, "browse");
+  assert.equal(harness.state.comments.length, 2);
+
+  harness.press("return");
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.equal(harness.result?.preserveReasonFormatting, true);
+  assert.match(harness.result?.reason ?? "", /\[step 1\].*need coverage/u);
+  assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
+});
+
+test("Enter with comments and edited plan appends updated plan to feedback reason", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const edited = `${SAMPLE_PLAN}\nEdited in VISUAL.\n`;
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ plan: edited, status: "updated" }),
+    },
+  );
+  harness.press("g");
+  for (const ch of "shrink scope") harness.press(ch);
+  harness.press("return");
+  harness.press("return", {}, { locale: "en-US" });
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
+  assert.match(
+    harness.result?.reason ?? "",
+    /User modified the plan\. The updated plan is as follows:\n[\s\S]*Edited in VISUAL\./u,
+  );
+  assert.equal(harness.result?.modifiedInput, undefined);
+});
+
+test("review feedback with edited plan appends zh-CN updated plan text", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const edited = `${SAMPLE_PLAN}\n改过的计划\n`;
+  harness.press(
+    "g",
+    { ctrl: true },
+    {
+      editPlan: () => ({ plan: edited, status: "updated" }),
+    },
+  );
+  harness.press("g");
+  for (const ch of "shrink scope") harness.press(ch);
+  harness.press("return");
+  harness.press("r");
+  harness.press("return", {}, { locale: "zh-CN" });
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
+  assert.match(
+    harness.result?.reason ?? "",
+    /用户已修改计划，修改后的计划如下：\n[\s\S]*改过的计划/u,
+  );
+});
+
+test("Enter without comments still approves", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  harness.press("return");
+  assert.equal(harness.result?.decision, "allow");
+  assert.equal(harness.result?.reasonSource, undefined);
+  assert.equal(harness.result?.modifiedInput, undefined);
+});
+
+test("browse help switches Enter action when comments exist", () => {
+  const without = DEFAULT_TUI_COPY.planApproval.help(0);
+  const withComments = DEFAULT_TUI_COPY.planApproval.help(2);
+  assert.match(without, /Enter approve/u);
+  assert.doesNotMatch(without, /send feedback/u);
+  assert.match(withComments, /Enter send feedback \(2 comments\)/u);
+
+  const state = createPlanApprovalState(SAMPLE_PLAN);
+  state.comments = [{ id: "1", kind: "overall", text: "shrink scope" }];
+  const panelText = collectTextNodes(PlanApprovalPanelView({ state }))
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Enter send feedback \(1 comment\)/u);
+});
+
+test("plan approval count labels use English singular/plural and keep Chinese fixed", () => {
+  const en = DEFAULT_TUI_COPY.planApproval;
+  assert.equal(en.stepCount(1), "1 step");
+  assert.equal(en.stepCount(2), "2 steps");
+  assert.equal(en.commentCount(1), "1 comment");
+  assert.equal(en.commentCount(2), "2 comments");
+  assert.match(en.help(1), /Enter send feedback \(1 comment\)/u);
+  assert.match(en.help(2), /Enter send feedback \(2 comments\)/u);
+
+  const zh = getZCodeCopy("zh-CN").tui.planApproval;
+  assert.equal(zh.stepCount(1), "1 个步骤");
+  assert.equal(zh.stepCount(2), "2 个步骤");
+  assert.equal(zh.commentCount(1), "1 条意见");
+  assert.equal(zh.commentCount(2), "2 条意见");
+  assert.match(zh.help(1), /Enter 发送意见（1 条）/u);
+  assert.match(zh.help(2), /Enter 发送意见（2 条）/u);
+});
+
 
 test("review can delete a single comment before send", () => {
   const harness = createHarness(SAMPLE_PLAN);
@@ -260,7 +373,7 @@ test("composePlanFeedbackReason keeps step anchors", () => {
 });
 
 test("plan approval help wraps at hint boundaries on narrow widths", () => {
-  const help = DEFAULT_TUI_COPY.planApproval.help;
+  const help = DEFAULT_TUI_COPY.planApproval.help(0);
   const hints = help.split(" · ");
   const requiredKeys = ["Ctrl+G", "Enter", "Esc", "j/k"];
   // letter hints need word-ish checks so "g" does not match inside "Ctrl+G"
@@ -299,11 +412,11 @@ test("plan approval help wraps at hint boundaries on narrow widths", () => {
     assert.deepEqual(panelHelpLines, lines);
   }
 
-  assert.deepEqual(wrapPlanApprovalHints(help, 120), [help]);
+  assert.deepEqual(wrapPlanApprovalHints(help, 160), [help]);
 });
 
 test("plan approval panel stacks rows without overlap in opentui renderer", async () => {
-  const help = DEFAULT_TUI_COPY.planApproval.help;
+  const help = DEFAULT_TUI_COPY.planApproval.help(0);
   const cases = [
     { width: 120, height: 40, contentWidth: 100 },
     { width: 50, height: 40, contentWidth: 46 },
@@ -501,6 +614,93 @@ test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
     assert.equal(failedExit.kind, undefined);
   }
 });
+test("PgDn scrolls preview and Enter still approves", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const scrolls: number[] = [];
+  harness.press("pagedown", {}, {
+    previewPageSize: 7,
+    scrollPlanPreview: (delta) => {
+      scrolls.push(delta);
+    },
+  });
+  assert.deepEqual(scrolls, [7]);
+  harness.press("pageup", {}, {
+    previewPageSize: 7,
+    scrollPlanPreview: (delta) => {
+      scrolls.push(delta);
+    },
+  });
+  assert.deepEqual(scrolls, [7, -7]);
+  harness.press("return");
+  assert.equal(harness.result?.decision, "allow");
+});
+
+test("o opens mermaid preview or reports none", async () => {
+  const withMermaid = createHarness(`${SAMPLE_PLAN}\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`);
+  let opened = false;
+  withMermaid.press(
+    "o",
+    {},
+    {
+      locale: "en-US",
+      openMermaidPreview: async () => {
+        opened = true;
+        return {
+          kind: "opened",
+          htmlPath: "/tmp/preview.html",
+          open: { command: "xdg-open", opened: true },
+        };
+      },
+    },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(opened, true);
+  assert.match(withMermaid.state.statusMessage ?? "", /Opened Mermaid preview/u);
+
+  const without = createHarness(SAMPLE_PLAN);
+  let status = "";
+  without.press(
+    "o",
+    {},
+    {
+      locale: "zh-CN",
+      openMermaidPreview: async () => ({ kind: "none" }),
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(status, "当前计划没有 Mermaid 代码块");
+  assert.equal(without.state.statusMessage, status);
+});
+
+test("plan preview passes tableOptions and shows mermaid hint", () => {
+  const plan = `${SAMPLE_PLAN}\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`;
+  const state = createPlanApprovalState(plan);
+  const copy = getZCodeCopy("en-US").tui;
+  const node = PlanApprovalPanelView({ copy, state });
+  const markdownNodes = collectElementsOfType(node, MarkdownText);
+  assert.equal(markdownNodes.length, 1);
+  assert.deepEqual(markdownNodes[0]?.props.tableOptions, {
+    style: "grid",
+    widthMode: "content",
+    wrapMode: "word",
+  });
+  const panelText = collectTextNodes(node)
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Mermaid found: press o to open in browser/u);
+});
+
+test("estimatePlanPreviewRows adds table border rows", async () => {
+  const { estimatePlanPreviewRows } = await import("../src/app-plan-approval-panel.js");
+  const plain = "one\ntwo\nthree";
+  assert.equal(estimatePlanPreviewRows(plain), 3);
+  const table = ["| a | b |", "| --- | --- |", "| 1 | 2 |"].join("\n");
+  assert.equal(estimatePlanPreviewRows(table), 5);
+});
+
 
 function createHarness(plan: string): {
   readonly result: PermissionBrokerResult | undefined;
@@ -621,4 +821,28 @@ function collectTextLines(node: unknown): string[] {
   };
   visit(node);
   return lines;
+}
+
+function collectElementsOfType(
+  node: unknown,
+  type: unknown,
+): Array<{ props: Record<string, unknown> }> {
+  const elements: Array<{ props: Record<string, unknown> }> = [];
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      for (const child of value) visit(child);
+      return;
+    }
+    if (typeof value !== "object" || value === null || !("props" in value)) return;
+    const element = value as {
+      props?: { children?: unknown } & Record<string, unknown>;
+      type?: unknown;
+    };
+    if (element.type === type) {
+      elements.push({ props: element.props ?? {} });
+    }
+    visit(element.props?.children);
+  };
+  visit(node);
+  return elements;
 }
