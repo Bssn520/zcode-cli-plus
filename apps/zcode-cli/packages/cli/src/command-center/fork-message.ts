@@ -1,4 +1,6 @@
-import type { TuiSelection, TuiSelectionItem } from "@zcode/tui";
+import type { TuiSelection, TuiSelectionItem, TuiSubmitPromptResult } from "@zcode/tui";
+import { formatForkSwitchResult } from "./formatters.js";
+import type { CommandCenterDeps, CommandCenterForkResult } from "./types.js";
 import { formatTime, shortId, shortText } from "./utils.js";
 
 const COMPOSER_SELECTION_PLACEMENT = "composer";
@@ -139,4 +141,32 @@ function toolPreview(message: ForkTranscriptMessage): string {
     return "";
   }
   return `tools: ${toolNames.join(", ")}`;
+}
+
+
+export async function buildForkSwitchResult(
+  deps: CommandCenterDeps,
+  result: CommandCenterForkResult,
+): Promise<TuiSubmitPromptResult> {
+  const app = await deps.getApp();
+  const restoredMessages = app.loadSessionTranscript
+    ? await app.loadSessionTranscript()
+    : undefined;
+  return {
+    mode: deps.getMode?.(),
+    locale: app.getLocale?.(),
+    model: app.getModel?.(),
+    theme: app.getTheme?.(),
+    ...(restoredMessages !== undefined
+      ? {
+          resetSessionProjection: true,
+          restoredMessages,
+        }
+      : { resetSessionProjection: true }),
+    response: formatForkSwitchResult(result),
+    // [Fork] 是 Markdown shortcut_link；conceal 会吃掉方括号，tip 必须 plain
+    responseFormat: "plain",
+    thoughtLevel: app.getThoughtLevel?.(),
+    traceId: undefined,
+  };
 }

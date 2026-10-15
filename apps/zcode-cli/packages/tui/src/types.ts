@@ -159,6 +159,8 @@ export type TuiSubmitPromptResult = {
   theme?: UiThemePreference;
   projection?: Partial<TuiContextUsage>;
   response: string;
+  /** Tip/command text format when appended to the transcript. Default markdown. */
+  responseFormat?: "markdown" | "plain";
   exitRequested?: boolean;
   resetSessionProjection?: boolean;
   restoredMessages?: Array<{

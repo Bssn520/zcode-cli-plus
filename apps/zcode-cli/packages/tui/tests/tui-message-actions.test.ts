@@ -107,6 +107,43 @@ test("Enter on focused Fork submits /fork msg_<id> for confirm", () => {
   assert.equal(forkCommandForMessage("msg_a1"), "/fork msg_a1");
 });
 
+
+test("fork slash commands are hidden from the local transcript echo", async () => {
+  const { shouldHideSlashCommandFromTranscript, appendAgentResult } = await import(
+    "../src/app-submit.js"
+  );
+  assert.equal(shouldHideSlashCommandFromTranscript("/fork msg_a1"), true);
+  assert.equal(shouldHideSlashCommandFromTranscript("/fork msg_a1 --confirm"), true);
+  assert.equal(shouldHideSlashCommandFromTranscript("please fork this"), false);
+
+  const messages = appendAgentResult(
+    [
+      { content: "old prompt", role: "user" },
+      { content: "old answer", role: "agent" },
+      { content: "/fork msg_a1 --confirm", role: "user" },
+    ],
+    {
+      resetSessionProjection: true,
+      response: "已 Fork 到新会话：[Fork] 原标题",
+      responseFormat: "plain",
+      restoredMessages: [
+        { content: "before", role: "user" },
+        { id: "msg_a1", content: "fork point", role: "agent" },
+      ],
+    },
+  );
+  assert.deepEqual(messages, [
+    { content: "before", role: "user" },
+    { id: "msg_a1", content: "fork point", role: "agent" },
+    {
+      content: "已 Fork 到新会话：[Fork] 原标题",
+      parts: [{ format: "plain", text: "已 Fork 到新会话：[Fork] 原标题", type: "text" }],
+      role: "agent",
+    },
+  ]);
+  assert.ok(!messages.some((message) => /\/fork/.test(message.content)));
+});
+
 test("Esc clears message action focus without activating", () => {
   const result = resolveMessageActionsKey({
     busy: false,

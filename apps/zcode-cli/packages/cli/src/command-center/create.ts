@@ -20,6 +20,7 @@ import { attachCurrentSessionMetadata, normalizeTuiPromptInput } from "./metadat
 import {
   buildAssistantMessageSelection,
   buildForkConfirmSelection,
+  buildForkSwitchResult,
   parseForkTarget,
 } from "./fork-message.js";
 import { buildCheckpointSelection, buildSessionSelection } from "./selections.js";
@@ -308,11 +309,7 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
 
           if (deps.forkApp) {
             const result = await deps.forkApp({ targetMessageId: forkTarget.messageId });
-            return {
-              mode: deps.getMode?.(),
-              response: result.response,
-              traceId: undefined,
-            };
+            return buildForkSwitchResult(deps, result);
           }
 
           const app = await deps.getApp();
@@ -328,11 +325,7 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
           const result = await deps.forkApp(
             targetCheckpointId ? { targetCheckpointId } : undefined,
           );
-          return {
-            mode: deps.getMode?.(),
-            response: result.response,
-            traceId: undefined,
-          };
+          return buildForkSwitchResult(deps, result);
         }
 
         const app = await deps.getApp();

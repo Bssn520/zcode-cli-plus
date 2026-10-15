@@ -388,7 +388,8 @@ test("TUI fork reapplies the parent model onto an unbound forked session", async
   const handler = createTuiSubmitPrompt(deps, createCliModeState(), "test");
   try {
     const result = await handler("/fork", { abortSignal: new AbortController().signal });
-    assert.match(result.response, /Switched to forked session forked/);
+    assert.equal(result.resetSessionProjection, true);
+    assert.match(result.response, /已 Fork 到新会话：/);
     assert.equal(created.at(-1)?.options.sessionId, "forked");
     assert.deepEqual(created.at(-1)?.writes, [parentSelection]);
     assert.equal(result.model, "personal/vendor/model$literal:free");
