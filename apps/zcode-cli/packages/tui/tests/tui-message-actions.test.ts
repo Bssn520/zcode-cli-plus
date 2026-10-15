@@ -99,7 +99,7 @@ test("fork slash commands are hidden from the local transcript echo", async () =
     ],
     {
       resetSessionProjection: true,
-      response: "已 Fork 到新会话：[Fork] 原标题",
+      response: "已 Fork 到新会话：\\[Fork\\] 原标题",
       restoredMessages: [
         { content: "before", role: "user" },
         { id: "msg_a1", content: "fork point", role: "agent" },
@@ -109,7 +109,7 @@ test("fork slash commands are hidden from the local transcript echo", async () =
   assert.deepEqual(messages, [
     { content: "before", role: "user" },
     { id: "msg_a1", content: "fork point", role: "agent" },
-    { content: "已 Fork 到新会话：[Fork] 原标题", role: "agent" },
+    { content: "已 Fork 到新会话：\\[Fork\\] 原标题", role: "agent" },
   ]);
   assert.ok(!messages.some((message) => /\/fork/.test(message.content)));
 });

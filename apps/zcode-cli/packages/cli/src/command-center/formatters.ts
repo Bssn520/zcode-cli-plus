@@ -17,5 +17,10 @@ export function formatNewSessionResult(sessionId: string): string {
 
 export function formatForkSwitchResult(result: CommandCenterForkResult): string {
   const title = result.title?.trim() || result.forkedSessionId;
-  return `已 Fork 到新会话：${title}`;
+  // tip 走 agent Markdown 渲染；不转义时 [Fork] 会被当成 link label 丢掉方括号
+  return `已 Fork 到新会话：${escapeMarkdownLinkLabels(title)}`;
+}
+
+function escapeMarkdownLinkLabels(text: string): string {
+  return text.replaceAll(/[\[\]]/g, "\\$&");
 }

@@ -8,6 +8,7 @@ import {
   timestampFromMessageId,
 } from "../src/command-center/fork-message.js";
 
+import { formatForkSwitchResult } from "../src/command-center/formatters.js";
 test("parseForkTarget keeps checkpoint forms and adds message forms", () => {
   assert.deepEqual(parseForkTarget(""), { kind: "checkpoint", checkpointId: undefined });
   assert.deepEqual(parseForkTarget("latest"), { kind: "checkpoint", checkpointId: undefined });
@@ -113,10 +114,22 @@ test("buildForkSwitchResult reloads child transcript and formats tip title", asy
   );
 
   assert.equal(result.resetSessionProjection, true);
-  assert.equal(result.response, "已 Fork 到新会话：[Fork] 原标题");
+  assert.equal(result.response, "已 Fork 到新会话：\\[Fork\\] 原标题");
   assert.deepEqual(result.restoredMessages, [
     { id: "msg_user", role: "user", content: "before fork" },
     { id: "msg_agent_1", role: "agent", content: "fork point" },
   ]);
   assert.ok(!(result.restoredMessages ?? []).some((message) => /\/fork/.test(message.content)));
+});
+
+
+test("formatForkSwitchResult escapes [Fork] so Markdown keeps the brackets", () => {
+  assert.equal(
+    formatForkSwitchResult({ forkedSessionId: "sess_child", title: "[Fork] first TOOLME" }),
+    "已 Fork 到新会话：\\[Fork\\] first TOOLME",
+  );
+  assert.equal(
+    formatForkSwitchResult({ forkedSessionId: "sess_child" }),
+    "已 Fork 到新会话：sess_child",
+  );
 });
