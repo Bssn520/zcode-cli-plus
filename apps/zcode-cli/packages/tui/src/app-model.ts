@@ -99,6 +99,7 @@ export type DraftImageAttachment = {
   mediaType: TuiClipboardImage["mediaType"];
   placeholder: string;
   sizeBytes?: number;
+  sourcePath?: string;
   type: "image";
 };
 

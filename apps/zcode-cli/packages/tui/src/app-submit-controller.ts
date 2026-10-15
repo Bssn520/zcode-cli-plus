@@ -1,6 +1,7 @@
 import React from "react";
 import type { ModelSelection } from "@zcode/shared";
 import type { SessionEvent, TurnId } from "@zcode/contracts";
+import { resolveImageAttachmentsForSubmit } from "./app-image-files.js";
 import { submitDuringActiveTurn, submitIdleTurn } from "./app-submit.js";
 import type {
   DraftAttachment,
@@ -46,12 +47,32 @@ export function useSubmitValue(input: {
         return;
       }
 
+      let nextId =
+        input.draftAttachmentsRef.current.reduce(
+          (maxId, attachment) => Math.max(maxId, attachment.id),
+          0,
+        ) + 1;
+      const resolved = await resolveImageAttachmentsForSubmit({
+        allocateId: () => nextId++,
+        attachments: input.draftAttachmentsRef.current,
+        cwd: input.options.workspaceDirectory,
+        text,
+      });
+      if (resolved.errors.length > 0) {
+        input.setStatus(resolved.errors[0]!);
+        input.setStatusDetails(resolved.errors);
+        if (resolved.errors.some((error) => error.includes("too large"))) {
+          return;
+        }
+      }
+      const draftAttachments = resolved.attachments;
+
       if (input.busy) {
         await submitDuringActiveTurn({
           activeTurnId: input.activeTurnId,
           applyResult: input.applyResult,
           applySessionEvent: input.applySessionEvent,
-          draftAttachments: input.draftAttachmentsRef.current,
+          draftAttachments,
           messageInsertIndex: input.messageInsertIndex,
           options: input.options,
           requestPermission: input.requestPermission,
@@ -70,7 +91,7 @@ export function useSubmitValue(input: {
       await submitIdleTurn({
         applyResult: input.applyResult,
         applySessionEvent: input.applySessionEvent,
-        draftAttachments: input.draftAttachmentsRef.current,
+        draftAttachments,
         options: input.options,
         requestPermission: input.requestPermission,
         setBusy: input.setBusy,
