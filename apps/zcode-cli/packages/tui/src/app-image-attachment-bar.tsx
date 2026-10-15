@@ -1,3 +1,6 @@
+import type { BoxRenderable } from "@mbears/opentui-core";
+import { CliRenderEvents } from "@mbears/opentui-core";
+import { useRenderer } from "@mbears/opentui-react";
 import React from "react";
 import { imageAttachmentLabel } from "./app-image-files.js";
 import type { DraftAttachment, DraftImageAttachment } from "./app-model.js";
@@ -7,7 +10,19 @@ import {
   detectImageProtocol,
   formatImageAttachmentFallback,
   parseImageDimensions,
+  type ImageProtocol,
 } from "./terminal-image.js";
+import {
+  IMAGE_THUMB_COLUMNS,
+  IMAGE_THUMB_ROWS,
+  buildOverlayClearSequence,
+  buildOverlayDrawSequence,
+  dataUrlBase64,
+  overlaySignature,
+  shouldRedrawOverlay,
+  type OverlayDrawState,
+  type OverlaySlot,
+} from "./terminal-image-overlay.js";
 
 const h = React.createElement as (
   type: React.ElementType | string,
@@ -23,10 +38,102 @@ export function ImageAttachmentBar({
   const images = attachments.filter(
     (attachment): attachment is DraftImageAttachment => attachment.type === "image",
   );
+  const protocol = detectImageProtocol();
+  const renderer = useRenderer();
+  const slotRefs = React.useRef(new Map<number, BoxRenderable>());
+  const lastSignatureRef = React.useRef<string | null>(null);
+  const protocolRef = React.useRef(protocol);
+  const imagesRef = React.useRef(images);
+  protocolRef.current = protocol;
+  imagesRef.current = images;
+
+  React.useEffect(() => {
+    if (protocol === "none") return;
+
+    const writeStdout = (sequence: string | undefined): void => {
+      if (!sequence) return;
+      process.stdout.write(sequence);
+    };
+
+    const clearOverlay = (): void => {
+      const active = protocolRef.current;
+      if (active !== "none") {
+        writeStdout(buildOverlayClearSequence(active));
+      }
+      lastSignatureRef.current = null;
+    };
+
+    const onFrame = (): void => {
+      const activeProtocol = protocolRef.current;
+      if (activeProtocol === "none") return;
+
+      const slots: OverlaySlot[] = [];
+      for (const image of imagesRef.current) {
+        const node = slotRefs.current.get(image.id);
+        const base64 = dataUrlBase64(image.dataUrl);
+        if (!node || !base64) continue;
+        // screenX/Y are 0-based; CSI H is 1-based.
+        slots.push({
+          base64,
+          col: node.screenX + 1,
+          id: image.id,
+          mediaType: image.mediaType,
+          name: imageAttachmentLabel(image),
+          row: node.screenY + 1,
+        });
+      }
+
+      if (slots.length === 0) {
+        if (lastSignatureRef.current !== null) {
+          writeStdout(buildOverlayClearSequence(activeProtocol));
+          lastSignatureRef.current = null;
+        }
+        return;
+      }
+
+      const state: OverlayDrawState = { protocol: activeProtocol, slots };
+      const signature = overlaySignature(state);
+      if (!shouldRedrawOverlay(lastSignatureRef.current, signature)) return;
+
+      if (activeProtocol === "kitty" && lastSignatureRef.current !== null) {
+        writeStdout(buildOverlayClearSequence(activeProtocol));
+      }
+      writeStdout(buildOverlayDrawSequence(state));
+      lastSignatureRef.current = signature;
+    };
+
+    // FRAME fires after renderNative; postProcess runs too early for graphics.
+    renderer.on(CliRenderEvents.FRAME, onFrame);
+    return () => {
+      renderer.off(CliRenderEvents.FRAME, onFrame);
+      if (lastSignatureRef.current !== null) clearOverlay();
+    };
+  }, [protocol, renderer]);
+
   if (images.length === 0) return null;
 
-  const protocol = detectImageProtocol();
-  const lines = images.map((attachment) => formatDraftImageLine(attachment, protocol));
+  if (protocol === "none") {
+    const lines = images.map((attachment) => formatDraftImageLine(attachment, protocol));
+    return h(
+      "box",
+      {
+        style: {
+          flexDirection: "column",
+          flexShrink: 0,
+          marginBottom: 0,
+          width: "100%",
+        },
+      },
+      ...lines.map((line, index) =>
+        h("text", { key: `image-attach-${index}`, style: { fg: palette.muted } }, line),
+      ),
+      h(
+        "text",
+        { key: "image-attach-hint", style: { fg: palette.muted } },
+        OPEN_IMAGE_SHORTCUT_HINT,
+      ),
+    );
+  }
 
   return h(
     "box",
@@ -34,12 +141,41 @@ export function ImageAttachmentBar({
       style: {
         flexDirection: "column",
         flexShrink: 0,
+        gap: 0,
         marginBottom: 0,
         width: "100%",
       },
     },
-    ...lines.map((line, index) =>
-      h("text", { key: `image-attach-${index}`, style: { fg: palette.muted } }, line),
+    h(
+      "box",
+      {
+        style: {
+          flexDirection: "row",
+          flexShrink: 0,
+          gap: 1,
+        },
+      },
+      ...images.map((image) =>
+        h("box", {
+          key: `image-thumb-${image.id}`,
+          ref: (node: BoxRenderable | null) => {
+            if (node) slotRefs.current.set(image.id, node);
+            else slotRefs.current.delete(image.id);
+          },
+          style: {
+            flexShrink: 0,
+            height: IMAGE_THUMB_ROWS,
+            width: IMAGE_THUMB_COLUMNS,
+          },
+        }),
+      ),
+    ),
+    ...images.map((image) =>
+      h(
+        "text",
+        { key: `image-label-${image.id}`, style: { fg: palette.muted } },
+        formatDraftImageLine(image, protocol),
+      ),
     ),
     h(
       "text",
@@ -51,7 +187,7 @@ export function ImageAttachmentBar({
 
 export function formatDraftImageLine(
   attachment: DraftImageAttachment,
-  protocol = detectImageProtocol(),
+  protocol: ImageProtocol = detectImageProtocol(),
 ): string {
   const label = imageAttachmentLabel(attachment);
   const bytes = dataUrlToBytes(attachment.dataUrl);
