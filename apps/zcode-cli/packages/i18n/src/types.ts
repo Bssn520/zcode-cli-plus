@@ -253,6 +253,22 @@ export interface TuiCopy {
       busyHint: string;
       fork: string;
     };
+    tools: {
+      answered(summary: string): string;
+      bash(command: string): string;
+      edit(path: string): string;
+      failMark: string;
+      generic(name: string): string;
+      glob(pattern: string): string;
+      grep(pattern: string): string;
+      planApproved: string;
+      planRejected: string;
+      planSubmitted: string;
+      read(path: string): string;
+      runningMark: string;
+      successMark: string;
+      write(path: string): string;
+    };
     title: string;
     workflow: {
       actors: string;

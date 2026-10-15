@@ -3,6 +3,7 @@ import type React from "react";
 import type { Message, ToolResultDisplay, ToolTranscriptPart } from "./app-model.js";
 import { formatFileDiffDisplay } from "./app-tool-diff-display.js";
 import { formatToolFilePath } from "./app-tool-path-display.js";
+import { truncateToolOutputForTranscript } from "./app-tool-summary.js";
 import { truncateDisplay } from "./app-terminal-width.js";
 import { asRecord, booleanField, stringField } from "./state.js";
 
@@ -69,6 +70,8 @@ export function applyToolTranscriptEvent(
   }
 
   if (event.type === SessionEventType.ToolCallResult) {
+    const result = asRecord(payload.result);
+    const content = stringField(result, "content");
     handlers.setMessages((current) =>
       updateOrAppendToolPart(
         current,
@@ -77,6 +80,9 @@ export function applyToolTranscriptEvent(
         {
           resultDisplay: resultDisplayFromPayload(payload),
           status: "completed",
+          ...(content
+            ? { output: truncateToolOutputForTranscript(content) }
+            : {}),
         },
         assistantMessageId,
       ),
@@ -213,6 +219,7 @@ function updateOrAppendToolPart(
       toolName,
       type: "tool",
       ...(patch.error ? { error: patch.error } : {}),
+      ...(patch.output ? { output: patch.output } : {}),
       ...(patch.resultDisplay ? { resultDisplay: patch.resultDisplay } : {}),
     },
     assistantMessageId,

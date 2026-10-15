@@ -30,11 +30,36 @@ const messages: Message[] = [
   { id: "msg_a3", role: "agent", content: "third" },
 ];
 
-test("only completed agent messages with ids are forkable", () => {
+test("only the turn-final completed agent text message is forkable in the action bar", () => {
   assert.equal(isForkableAgentMessage(messages[1]), true);
   assert.equal(isForkableAgentMessage(messages[2]), false);
-  assert.equal(shouldRenderMessageActionBar(messages[3]!), true);
-  assert.equal(shouldRenderMessageActionBar(messages[0]!), false);
+  assert.equal(shouldRenderMessageActionBar(messages, 1), false);
+  assert.equal(shouldRenderMessageActionBar(messages, 3), true);
+  assert.equal(shouldRenderMessageActionBar(messages, 0), false);
+});
+
+test("tool-only agent messages are not forkable", () => {
+  const toolOnly: Message[] = [
+    { id: "msg_user", role: "user", content: "hi" },
+    {
+      id: "msg_tools",
+      role: "agent",
+      content: "",
+      parts: [
+        {
+          detailLines: ["command: npm test"],
+          status: "completed",
+          toolCallId: "call-1",
+          toolName: "Bash",
+          type: "tool",
+        },
+      ],
+    },
+    { id: "msg_final", role: "agent", content: "done" },
+  ];
+  assert.equal(isForkableAgentMessage(toolOnly[1]), false);
+  assert.equal(shouldRenderMessageActionBar(toolOnly, 1), false);
+  assert.equal(shouldRenderMessageActionBar(toolOnly, 2), true);
 });
 
 test("Ctrl+Shift+F enters focus on the latest forkable row", () => {
