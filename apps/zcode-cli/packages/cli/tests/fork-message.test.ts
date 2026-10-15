@@ -114,7 +114,8 @@ test("buildForkSwitchResult reloads child transcript and formats tip title", asy
   );
 
   assert.equal(result.resetSessionProjection, true);
-  assert.equal(result.response, "已 Fork 到新会话：\\[Fork\\] 原标题");
+  assert.equal(result.response, "已 Fork 到新会话：[Fork] 原标题");
+  assert.equal(result.responseFormat, "plain");
   assert.deepEqual(result.restoredMessages, [
     { id: "msg_user", role: "user", content: "before fork" },
     { id: "msg_agent_1", role: "agent", content: "fork point" },
@@ -123,10 +124,10 @@ test("buildForkSwitchResult reloads child transcript and formats tip title", asy
 });
 
 
-test("formatForkSwitchResult escapes [Fork] so Markdown keeps the brackets", () => {
+test("formatForkSwitchResult keeps [Fork] brackets in the tip text", () => {
   assert.equal(
     formatForkSwitchResult({ forkedSessionId: "sess_child", title: "[Fork] first TOOLME" }),
-    "已 Fork 到新会话：\\[Fork\\] first TOOLME",
+    "已 Fork 到新会话：[Fork] first TOOLME",
   );
   assert.equal(
     formatForkSwitchResult({ forkedSessionId: "sess_child" }),

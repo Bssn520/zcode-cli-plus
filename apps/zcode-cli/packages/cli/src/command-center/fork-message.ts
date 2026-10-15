@@ -164,6 +164,8 @@ export async function buildForkSwitchResult(
         }
       : { resetSessionProjection: true }),
     response: formatForkSwitchResult(result),
+    // [Fork] 是 Markdown shortcut_link；conceal 会吃掉方括号，tip 必须 plain
+    responseFormat: "plain",
     thoughtLevel: app.getThoughtLevel?.(),
     traceId: undefined,
   };

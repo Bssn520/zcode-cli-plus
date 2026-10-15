@@ -194,6 +194,21 @@ test("message rows keep user and explicit plain text parts unformatted", () => {
   assert.ok(collectTextLines(partRow).includes("**plain**"));
 });
 
+test("fork tip with [Fork] keeps brackets via plain transcript rendering", async () => {
+  const { appendAgentResult } = await import("../src/app-submit.js");
+  const tip = "已 Fork 到新会话：[Fork] first TOOLME";
+  const messages = appendAgentResult([], {
+    response: tip,
+    responseFormat: "plain",
+  });
+  const tipMessage = messages.at(-1);
+  assert.ok(tipMessage);
+  const row = MessageRow({ index: 0, message: tipMessage });
+
+  assert.equal(collectElementsOfType(row, MarkdownText).length, 0);
+  assert.ok(collectTextLines(row).some((line) => line.includes("[Fork] first TOOLME")));
+});
+
 function collectTextLines(node: unknown): string[] {
   const lines: string[] = [];
   const visit = (value: unknown) => {

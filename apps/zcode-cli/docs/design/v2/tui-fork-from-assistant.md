@@ -53,4 +53,4 @@ While the main session is busy/streaming, Fork is disabled in the action bar. Sl
 6. Transcript projection includes `id`.
 7. After switching to the forked session, the child has the same model/provider/reasoning as the parent had at fork time (UI glue `setModel`, not a core change).
 8. After fork, TUI clears the parent transcript and reloads the child history (`resetSessionProjection` + `restoredMessages`, same as `/resume`); `/fork …` / `--confirm` are not echoed as user rows.
-9. CLI renames the child title to `[Fork] <原标题>` via `setCustomSessionTitle` after switch (core still creates `Fork of …`; do not edit `session-fork.ts`). Tip line: `已 Fork 到新会话：[Fork] <原标题>`.
+9. CLI renames the child title to `[Fork] <原标题>` via `setCustomSessionTitle` after switch (core still creates `Fork of …`; do not edit `session-fork.ts`). Tip line: `已 Fork 到新会话：[Fork] <原标题>` — append with `responseFormat: "plain"` (OpenTUI markdown `shortcut_link` + conceal strips `[…]`; backslash escapes show literally).

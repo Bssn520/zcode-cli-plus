@@ -17,10 +17,6 @@ export function formatNewSessionResult(sessionId: string): string {
 
 export function formatForkSwitchResult(result: CommandCenterForkResult): string {
   const title = result.title?.trim() || result.forkedSessionId;
-  // tip 走 agent Markdown 渲染；不转义时 [Fork] 会被当成 link label 丢掉方括号
-  return `已 Fork 到新会话：${escapeMarkdownLinkLabels(title)}`;
-}
-
-function escapeMarkdownLinkLabels(text: string): string {
-  return text.replaceAll(/[\[\]]/g, "\\$&");
+  // tip 在 TUI 以 plain text 渲染；勿 Markdown 转义——OpenTUI conceal 不吃 \[，反斜杠会原样显示
+  return `已 Fork 到新会话：${title}`;
 }
