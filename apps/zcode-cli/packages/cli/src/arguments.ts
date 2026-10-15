@@ -113,6 +113,10 @@ export const parseGlobalArgs = (argv: string[]) =>
       "no-session": {
         type: "boolean",
       },
+      // `zcp update --check`：strict 解析器要求全局注册，run.ts 再透传给 update-command。
+      check: {
+        type: "boolean",
+      },
     },
     strict: true,
   });

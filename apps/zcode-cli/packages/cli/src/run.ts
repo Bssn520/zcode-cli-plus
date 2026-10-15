@@ -709,7 +709,14 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     case "skills":
       return await runSkillsCommand(ctx, options, commandDeps, parsed.positionals.slice(1));
     case "update":
-      return await runUpdateCommand(ctx, parsed.positionals.slice(1), version);
+      return await runUpdateCommand(
+        ctx,
+        [
+          ...parsed.positionals.slice(1),
+          ...(parsed.values.check === true ? ["--check"] : []),
+        ],
+        version,
+      );
     case "tui":
       return await runTuiCommand(
         ctx,

@@ -23,6 +23,7 @@ export const zhCN: ZCodeCopy = {
   plugins    管理插件与市场（\`plugins list|install|uninstall|enable|disable|update|validate|marketplace ...\`；别名 plugin）
   skills     列出本地 skills（\`skills list\`）
   tui        打开终端 UI
+  update     将 zcp 更新到最新 npm 版本（--check 仅检查）
   version    打印 CLI 版本
 
 选项:

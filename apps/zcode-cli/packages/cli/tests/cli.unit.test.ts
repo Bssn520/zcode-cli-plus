@@ -4189,6 +4189,10 @@ test("prints help with help flag", async () => {
   assert.equal(exitCode, 0);
   assert.match(ctx.stdout.output(), /With no command, zcode opens the full-screen TUI\./);
   assert.match(ctx.stdout.output(), /Commands:/);
+  assert.match(
+    ctx.stdout.output(),
+    /update\s+Update zcp to the latest npm version \(--check to only check\)/,
+  );
   assert.match(ctx.stdout.output(), /--force-mcs/);
   assert.match(ctx.stdout.output(), /--surface <surface>/);
   assert.match(ctx.stdout.output(), /--resume <sessionId>/);

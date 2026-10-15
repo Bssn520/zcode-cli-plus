@@ -138,3 +138,30 @@ test("update prints manual command on registry failure", async () => {
   assert.match(ctx.stderr.output(), /Failed to check for updates: network down/);
   assert.match(ctx.stderr.output(), new RegExp(UPDATE_INSTALL_COMMAND));
 });
+
+test("run() accepts update --check", async () => {
+  const ctx: RunContext & {
+    stderr: CapturedWriteStream;
+    stdout: CapturedWriteStream;
+  } = {
+    argv: ["update", "--check"],
+    stderr: createWriteStream(),
+    stdin: { isTTY: false } as NodeJS.ReadStream,
+    stdout: createWriteStream(),
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ version: "0.0.0" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })) as typeof fetch;
+  try {
+    const { run } = await import("../src/run.js");
+    const code = await run(ctx);
+    assert.equal(code, 0);
+    assert.doesNotMatch(ctx.stderr.output(), /Unknown option/);
+    assert.match(ctx.stdout.output(), /已是最新版本 0\.0\.0/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
