@@ -307,29 +307,11 @@ export interface TuiCopy {
   };
   planApproval: {
     title: string;
-    prompt: string;
-    stepsHeading: string;
-    filesHeading: string;
-    risksHeading: string;
-    previewHeading: string;
-    editedBadge: string;
-    noteMarker: string;
-    stepCount(count: number): string;
-    commentCount(count: number): string;
-    help(commentCount: number): string;
-    mermaidHint: string;
+    approveLabel: string;
+    feedbackPlaceholder: string;
+    help(hasMermaid: boolean): string;
     mermaidNone: string;
     mermaidOpenFailed(message: string): string;
     mermaidOpened: string;
-    commentStepTitle(index: number): string;
-    commentOverallTitle: string;
-    commentHelp: string;
-    reviewTitle: string;
-    reviewHelp: string;
-    stepCommentSummary(input: { index: number; label: string; text: string }): string;
-    overallCommentSummary(text: string): string;
-    editorNotFound: string;
-    editorFailed(message: string): string;
-    feedbackModifiedPlan(plan: string): string;
   };
 }

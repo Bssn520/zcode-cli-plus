@@ -369,33 +369,13 @@ Slash Commands:
     },
     planApproval: {
       title: "计划确认",
-      prompt: "退出计划模式并开始实现？",
-      stepsHeading: "步骤",
-      filesHeading: "文件",
-      risksHeading: "风险",
-      previewHeading: "预览",
-      editedBadge: "已编辑",
-      noteMarker: "备注",
-      stepCount: (count) => `${count} 个步骤`,
-      commentCount: (count) => `${count} 条意见`,
-      help: (commentCount) =>
-        commentCount > 0
-          ? `Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 发送意见（${commentCount} 条） · Esc 取消 · j/k 选择 · PgUp/PgDn 滚动预览 · o 打开 Mermaid`
-          : "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择 · PgUp/PgDn 滚动预览 · o 打开 Mermaid",
-      mermaidHint: "含 Mermaid：按 o 在浏览器查看",
+      approveLabel: "批准",
+      feedbackPlaceholder: "输入修改意见，回车发送给 agent 重新出计划…",
+      help: (hasMermaid) =>
+        hasMermaid ? "PgUp/PgDn 滚动 · o 打开 Mermaid" : "PgUp/PgDn 滚动",
       mermaidNone: "当前计划没有 Mermaid 代码块",
       mermaidOpenFailed: (message) => `无法打开 Mermaid 预览：${message}`,
       mermaidOpened: "已在浏览器中打开 Mermaid 预览",
-      commentStepTitle: (index) => `步骤 ${index} 的意见`,
-      commentOverallTitle: "整体计划意见",
-      commentHelp: "Enter 挂上 · Esc 返回",
-      reviewTitle: "审阅意见",
-      reviewHelp: "Enter 发送意见 · d 删除 · Esc 返回 · j/k 选择",
-      stepCommentSummary: ({ index, label, text }) => `[步骤 ${index}] ${label}：${text}`,
-      overallCommentSummary: (text) => `[整体] ${text}`,
-      editorNotFound: "未找到编辑器：请设置 $VISUAL 或 $EDITOR",
-      editorFailed: (message) => `无法打开编辑器：${message}`,
-      feedbackModifiedPlan: (plan) => `用户已修改计划，修改后的计划如下：\n${plan}`,
     },
   },
 };
