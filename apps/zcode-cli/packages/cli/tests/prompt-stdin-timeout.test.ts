@@ -89,6 +89,96 @@ test("readStdinTextIfPiped skips TTY stdin", async () => {
   assert.equal(text, undefined);
 });
 
+test("idle non-TTY stdin without first byte is abandoned after ~1s", async () => {
+  const stdin = new PassThrough() as PassThrough & { isTTY?: boolean; unref?: () => void };
+  stdin.isTTY = false;
+  stdin.unref = () => undefined;
+
+  const started = Date.now();
+  const text = await readStdinTextIfPiped(stdin);
+  const elapsedMs = Date.now() - started;
+
+  assert.equal(text, undefined);
+  assert.ok(elapsedMs >= 900, `expected ~1s idle wait, got ${elapsedMs}ms`);
+  assert.ok(elapsedMs < 2500, `idle abandon took too long: ${elapsedMs}ms`);
+});
+
+test("never-ending empty pipe does not block --prompt after idle timeout", async () => {
+  const stdin = new PassThrough() as PassThrough & { isTTY?: boolean; unref?: () => void };
+  stdin.isTTY = false;
+  stdin.unref = () => undefined;
+
+  let submitted: unknown;
+  const started = Date.now();
+  const ctx = createContext(["--prompt", "hi"], stdin as NodeJS.ReadStream);
+  const code = await run(
+    ctx,
+    createPromptDeps({
+      createZCodeApp: () =>
+        ({
+          sessionId: "session-test",
+          traceId: "trace-test",
+          runtime: {} as never,
+          submitPrompt: async (prompt: unknown) => {
+            submitted = prompt;
+            return {
+              events: [],
+              projection: fakeProjection as never,
+              response: "ok",
+              traceId: "trace-test" as never,
+              turnId: "turn-test" as never,
+            };
+          },
+        }) as never,
+    }),
+  );
+  const elapsedMs = Date.now() - started;
+
+  assert.equal(code, 0);
+  assert.equal(submitted, "hi");
+  assert.equal(ctx.stdout.output(), "ok\n");
+  assert.ok(elapsedMs >= 900, `expected ~1s idle wait, got ${elapsedMs}ms`);
+  assert.ok(elapsedMs < 2500, `prompt path hung too long on idle stdin: ${elapsedMs}ms`);
+});
+
+test("--timeout covers hanging stdin before submitPrompt", async () => {
+  const stdin = new PassThrough() as PassThrough & { isTTY?: boolean; unref?: () => void };
+  stdin.isTTY = false;
+  stdin.unref = () => undefined;
+  // First byte arrives, but EOF never does — idle timeout must not apply.
+  stdin.write("partial");
+
+  let submitted = false;
+  const started = Date.now();
+  const ctx = createContext(["--prompt", "hang-stdin", "--timeout", "1"], stdin as NodeJS.ReadStream);
+  const code = await run(
+    ctx,
+    createPromptDeps({
+      createZCodeApp: () =>
+        ({
+          sessionId: "session-test",
+          traceId: "trace-test",
+          runtime: {} as never,
+          close: async () => undefined,
+          submitPrompt: async () => {
+            submitted = true;
+            throw new Error("submitPrompt should not run while stdin hangs");
+          },
+        }) as never,
+      exitProcess: () => undefined,
+      shutdownCleanupTimeoutMs: 50,
+    }),
+  );
+  const elapsedMs = Date.now() - started;
+
+  assert.equal(code, 2);
+  assert.equal(submitted, false);
+  assert.match(ctx.stderr.output(), /timed out after 1s/);
+  assert.ok(elapsedMs >= 900, `expected ~1s timeout, got ${elapsedMs}ms`);
+  assert.ok(elapsedMs < 2500, `timeout during stdin took too long: ${elapsedMs}ms`);
+  process.exitCode = undefined;
+});
+
 test("piped stdin is prepended to --prompt before submitPrompt", async () => {
   const stdin = new PassThrough() as PassThrough & { isTTY?: boolean };
   stdin.isTTY = false;
@@ -160,6 +250,7 @@ test("--timeout aborts a hanging submitPrompt with exit 2", async () => {
   assert.equal(code, 2);
   assert.match(ctx.stderr.output(), /timed out after 1s/);
   assert.equal(ctx.stdout.output(), "");
+  process.exitCode = undefined;
 });
 
 test("provider-style API errors still exit 1", async () => {

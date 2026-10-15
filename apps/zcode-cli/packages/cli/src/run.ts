@@ -21,7 +21,7 @@ import { runLoginCommand, runLogoutCommand } from "./login-command.js";
 import { CLI_COMMAND_NAME, CLI_PROCESS_NAME } from "./process-name.js";
 import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-command.js";
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
-import { runPrompt } from "./prompt-command.js";
+import { armHeadlessTimeout, runPrompt, type HeadlessTimeoutArm } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
@@ -37,8 +37,9 @@ import type {
   RunDependencies,
   RunPromptHeadlessOptions,
 } from "./cli-types.js";
-import { parseCliModelOption, parseCliTimeoutSeconds } from "./headless-flags.js";
+import { createTimeoutError, isTimeoutError, parseCliModelOption, parseCliTimeoutSeconds } from "./headless-flags.js";
 import { combinePromptWithStdin, readStdinTextIfPiped } from "./stdin-text.js";
+import { DEFAULT_CLI_CLEANUP_TIMEOUT_MS } from "./shutdown.js";
 
 export type { RunDependencies } from "./cli-types.js";
 
@@ -566,11 +567,39 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
 
   if (typeof parsed.values.prompt === "string") {
     let promptText = parsed.values.prompt;
+    // Arm --timeout before stdin so idle/open pipes cannot outlive the deadline.
+    let timeoutArm: HeadlessTimeoutArm | undefined;
+    if (timeoutSeconds !== undefined) {
+      timeoutArm = armHeadlessTimeout({
+        timeoutSeconds,
+        cleanupTimeoutMs: Math.max(
+          1,
+          Math.trunc(commandDeps.shutdownCleanupTimeoutMs ?? DEFAULT_CLI_CLEANUP_TIMEOUT_MS),
+        ),
+        exitProcess: commandDeps.exitProcess,
+      });
+    }
     try {
       // Only consume stdin when -p/--prompt is present; never for TUI/subcommand paths.
-      const stdinText = await readStdinTextIfPiped(ctx.stdin);
+      const stdinText = await readStdinTextIfPiped(ctx.stdin, {
+        signal: timeoutArm?.abortController.signal,
+      });
       promptText = combinePromptWithStdin(promptText, stdinText);
     } catch (error) {
+      const timedOut =
+        timeoutArm?.state.timedOut === true ||
+        isTimeoutError(error) ||
+        isTimeoutError(timeoutArm?.abortController.signal.reason);
+      if (timedOut && timeoutSeconds !== undefined) {
+        // Keep failsafe watchdog; clear only the main timer.
+        clearTimeout(timeoutArm!.timeoutTimer);
+        ctx.stderr.write(`Error: ${createTimeoutError(timeoutSeconds).message}\n`);
+        return 2;
+      }
+      if (timeoutArm) {
+        clearTimeout(timeoutArm.timeoutTimer);
+        timeoutArm.state.cancelTimeoutWatchdog?.();
+      }
       const message = error instanceof Error ? error.message : String(error);
       ctx.stderr.write(`Error: ${message}\n`);
       return 1;
@@ -588,7 +617,9 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       forceMcs,
       presentationSurface,
       workflowMode,
-      headlessOptions,
+      (timeoutArm
+        ? { ...headlessOptions, timeoutArm }
+        : headlessOptions) as RunPromptHeadlessOptions,
     );
   }
 

@@ -44,6 +44,37 @@ import type {
 import { createTimeoutError, isTimeoutError } from "./headless-flags.js";
 import { createEphemeralSessionStore, type EphemeralSessionStoreHandle } from "./no-session-store.js";
 
+/** Wall-clock timeout armed before stdin so --timeout covers the whole headless run. */
+export type HeadlessTimeoutArm = {
+  abortController: AbortController;
+  timeoutTimer: NodeJS.Timeout;
+  state: {
+    timedOut: boolean;
+    cancelTimeoutWatchdog?: () => void;
+  };
+};
+
+export function armHeadlessTimeout(options: {
+  timeoutSeconds: number;
+  cleanupTimeoutMs: number;
+  exitProcess?: (code: number) => void;
+}): HeadlessTimeoutArm {
+  const abortController = new AbortController();
+  const state: HeadlessTimeoutArm["state"] = { timedOut: false };
+  const timeoutTimer = setTimeout(() => {
+    state.timedOut = true;
+    process.exitCode = 2;
+    abortController.abort(createTimeoutError(options.timeoutSeconds));
+    // Provider retries may ignore abort; force the process out after cleanup budget.
+    state.cancelTimeoutWatchdog = scheduleCliExitWatchdog({
+      exitCode: 2,
+      exitProcess: options.exitProcess,
+      timeoutMs: options.cleanupTimeoutMs + 1_000,
+    });
+  }, options.timeoutSeconds * 1000);
+  return { abortController, timeoutTimer, state };
+}
+
 /**
  * Does this run print a JSON summary at the end?
  *
@@ -147,23 +178,24 @@ export const runPrompt = async (
   let providerRegistryRuntime: Awaited<
     ReturnType<NonNullable<RunDependencies["startProcessProviderRegistryRuntime"]>>
   >;
-  const abortController = new AbortController();
+  const armedTimeout = (headlessOptions as { timeoutArm?: HeadlessTimeoutArm }).timeoutArm;
+  const abortController = armedTimeout?.abortController ?? new AbortController();
   const cleanupTimeoutMs = Math.max(
     1,
     Math.trunc(deps.shutdownCleanupTimeoutMs ?? DEFAULT_CLI_CLEANUP_TIMEOUT_MS),
   );
-  let timedOut = false;
-  let timeoutTimer: NodeJS.Timeout | undefined;
-  let cancelTimeoutWatchdog: (() => void) | undefined;
+  const timeoutState = armedTimeout?.state ?? { timedOut: false };
+  let timeoutTimer: NodeJS.Timeout | undefined = armedTimeout?.timeoutTimer;
   let ephemeralSession: EphemeralSessionStoreHandle | undefined;
-  if (headlessOptions.timeoutSeconds !== undefined) {
+  if (headlessOptions.timeoutSeconds !== undefined && !armedTimeout) {
     const timeoutSeconds = headlessOptions.timeoutSeconds;
     timeoutTimer = setTimeout(() => {
-      timedOut = true;
+      timeoutState.timedOut = true;
+      process.exitCode = 2;
       const timeoutError = createTimeoutError(timeoutSeconds);
       abortController.abort(timeoutError);
       // Provider retries may ignore abort; force the process out after cleanup budget.
-      cancelTimeoutWatchdog = scheduleCliExitWatchdog({
+      timeoutState.cancelTimeoutWatchdog = scheduleCliExitWatchdog({
         exitCode: 2,
         exitProcess: deps.exitProcess,
         timeoutMs: cleanupTimeoutMs + 1_000,
@@ -476,7 +508,10 @@ export const runPrompt = async (
     ctx.stdout.write(`${turnResponses.join("\n\n")}\n`);
     return 0;
   } catch (error) {
-    const timeoutHit = timedOut || isTimeoutError(error) || isTimeoutError(abortController.signal.reason);
+    const timeoutHit =
+      timeoutState.timedOut ||
+      isTimeoutError(error) ||
+      isTimeoutError(abortController.signal.reason);
     const message = error instanceof Error ? error.message : String(error);
     ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
     if (options.verbose) {
@@ -491,11 +526,11 @@ export const runPrompt = async (
       // Keep the failsafe watchdog until process exit; do not cancel it here.
       return 2;
     }
-    cancelTimeoutWatchdog?.();
+    timeoutState.cancelTimeoutWatchdog?.();
     return 1;
   } finally {
     if (timeoutTimer) clearTimeout(timeoutTimer);
-    if (!timedOut) cancelTimeoutWatchdog?.();
+    if (!timeoutState.timedOut) timeoutState.cancelTimeoutWatchdog?.();
     stopObservingEvents();
     unregisterShutdownHandlers();
     await closeApp();
