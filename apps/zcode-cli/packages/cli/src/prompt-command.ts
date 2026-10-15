@@ -41,7 +41,11 @@ import type {
   RunDependencies,
   RunPromptHeadlessOptions,
 } from "./cli-types.js";
-import { createTimeoutError, isTimeoutError } from "./headless-flags.js";
+import {
+  completeCliModelSelection,
+  createTimeoutError,
+  isTimeoutError,
+} from "./headless-flags.js";
 import { createEphemeralSessionStore, type EphemeralSessionStoreHandle } from "./no-session-store.js";
 
 /** Wall-clock timeout armed before stdin so --timeout covers the whole headless run. */
@@ -319,7 +323,17 @@ export const runPrompt = async (
         ...resolveWorkflowModeRuntimeConfig(workflowMode),
         memory: { extractionEnabled: options.memoryBench === true },
         ...(headlessOptions.modelSelection
-          ? { modelSelection: headlessOptions.modelSelection }
+          ? {
+              modelSelection: completeCliModelSelection(
+                headlessOptions.modelSelection,
+                providerRegistryRuntime.runtime.registryService
+                  .getModel?.(
+                    headlessOptions.modelSelection.providerId,
+                    headlessOptions.modelSelection.modelId,
+                  )
+                  ?.config.optionSpecs.reasoningLevel.values,
+              ),
+            }
           : {}),
         modelStreaming: "on",
         presentationSurface,

@@ -6,6 +6,7 @@ import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import type { RunContext } from "@zcode/shared-types";
+import { completeCliModelSelection } from "../src/headless-flags.js";
 import { run } from "../src/run.js";
 import type { RunDependencies } from "../src/run.js";
 import {
@@ -302,6 +303,73 @@ test("--model provider/model is passed to createZCodeApp runtimeConfig", async (
 
   assert.equal(code, 0);
   assert.deepEqual(seen, { providerId: "zai", modelId: "glm-5.1" });
+});
+
+test("completeCliModelSelection uses last reasoning level as default", () => {
+  assert.deepEqual(
+    completeCliModelSelection({ providerId: "fake", modelId: "fake-model" }, ["low", "high"]),
+    {
+      providerId: "fake",
+      modelId: "fake-model",
+      options: { reasoningLevel: "high" },
+    },
+  );
+  assert.deepEqual(
+    completeCliModelSelection({ providerId: "fake", modelId: "fake-model" }, []),
+    { providerId: "fake", modelId: "fake-model" },
+  );
+  assert.deepEqual(
+    completeCliModelSelection({ providerId: "fake", modelId: "fake-model" }, undefined),
+    { providerId: "fake", modelId: "fake-model" },
+  );
+});
+
+test("--model fills default reasoningLevel from registry", async () => {
+  const ctx = createContext(["--prompt", "hi", "--model", "fake/fake-model"]);
+  let seen: unknown;
+  const code = await run(
+    ctx,
+    createPromptDeps({
+      startProcessProviderRegistryRuntime: async () =>
+        ({
+          dispose: () => {},
+          runtime: {
+            registryService: {
+              getModel: (providerId: string, modelId: string) =>
+                providerId === "fake" && modelId === "fake-model"
+                  ? {
+                      config: {
+                        optionSpecs: { reasoningLevel: { values: ["low", "high"] } },
+                      },
+                    }
+                  : undefined,
+            },
+          },
+        }) as never,
+      createZCodeApp: (options) => {
+        seen = options?.runtimeConfig?.modelSelection;
+        return {
+          sessionId: "session-test",
+          traceId: "trace-test",
+          runtime: {} as never,
+          submitPrompt: async () => ({
+            events: [],
+            projection: fakeProjection as never,
+            response: "hi",
+            traceId: "trace-test" as never,
+            turnId: "turn-test" as never,
+          }),
+        } as never;
+      },
+    }),
+  );
+
+  assert.equal(code, 0);
+  assert.deepEqual(seen, {
+    providerId: "fake",
+    modelId: "fake-model",
+    options: { reasoningLevel: "high" },
+  });
 });
 
 test("--model without provider exits 1", async () => {

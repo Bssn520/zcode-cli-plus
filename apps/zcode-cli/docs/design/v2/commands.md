@@ -41,7 +41,7 @@ TUI 的 slash command 候选列表见 [`tui-slash-command-suggestions.md`](./tui
 
 - 全局 `--cwd <path>`: 指定本次 CLI command 的有效工作目录。该目录会作为 session `workingDirectory`、dotenv 查找起点、skill discovery 目录、`--continue`/`/resume` 最近 session 查询目录以及 `doctor` 的报告目录。相对路径必须按 CLI 启动时的当前目录解析为绝对路径；空路径、不存在路径、不可访问路径或非目录路径必须在 CLI 入口边界返回明确错误，并且不得创建 app/session、不得发送模型请求。实现不得调用 `process.chdir()`，避免污染 TUI、ZCode app-server、多 session 和后台任务所在的 Node.js 进程。`--cwd` 是 CLI 参数覆盖，不新增 `ZCODE_*` 环境变量；若后续要增加环境变量形式，必须先补充用途、优先级、错误行为和测试覆盖。
 - 全局 `--prompt <text>`: 作为脚本友好的单轮 headless 入口。未显式传入 `--mode` 时，CLI 必须以 `yolo` permission mode 创建 runtime，避免无交互 broker 的 headless prompt 在常见写文件、执行命令路径上停在审批流；显式 `--mode build|edit|plan|yolo` 仍然优先于该默认值。该默认只属于 `--prompt` 入口，不改变无参数 TUI、`zcode tui`、ZCode app-server session 或单独 `--target` 的初始化 mode。当 stdin 为非 TTY 且已给出 `-p/--prompt <value>` 时，CLI 必须读取 stdin（上限 10MB）并按 `stdinText + "\\n\\n" + prompt` 拼接后再提交；无 `-p` 时不得消费 stdin；裸 `-p`（缺 value）仍报缺参，本轮不支持。诊断信息必须写 stderr，stdout 只保留 text / JSON / NDJSON。
-- 全局 `--model <provider/model>`: 仅运行时覆盖本次 `--prompt`/`--target` 的 `runtimeConfig.modelSelection`，不落盘用户默认模型。格式非法时退出码 1。与 `--resume` 同用时以 CLI 显式 `--model` 为准。
+- 全局 `--model <provider/model>`: 仅运行时覆盖本次 `--prompt`/`--target` 的 `runtimeConfig.modelSelection`，不落盘用户默认模型。写入时按与 TUI 主动选模型相同的规则补齐默认 `reasoningLevel`（catalog `reasoning.values` 最后一档 / `reasoning.defaultLevel`）；模型无 reasoning 档位时不写 `options`。格式非法时退出码 1。与 `--resume` 同用时以 CLI 显式 `--model` 为准。
 - 全局 `--timeout <seconds>`: 整次 headless run 上限（正整数秒）。到期 abort，stderr 提示后退出码 2；provider/API 等运行错误仍为 1；成功为 0。本轮不设隐式默认超时。
 - 全局 `--no-session`: 使用临时 Sqlite session DB（`zcp-nosession-*`）注入 `sessionStore`，运行结束删除；启动时清理超过 1 小时的残留临时库。与 `--resume` / `-c/--continue` 互斥（退出码 1）。JSON 输出仍可带 `sessionId`。
 - 全局 `--browser-use=headless`: 为 `--prompt`、`--target` 和 TUI 显式启用 CLI managed CDP Browser Use。CLI 在首次 backend discovery 时启动 native headless Chromium，只有完成 CDP handshake 后才返回 `type: "cdp"` descriptor。该参数不使用 `agent-browser`，不改变 browser-use plugin/node_repl 模型入口；plugin 禁用时不得启动 Chromium。`zcode app-server` 使用该参数必须 fail closed，避免 Desktop/Web Remote shared-host 链路获得第二个 browser runtime。
@@ -96,7 +96,7 @@ Headless `--prompt` 测试覆盖：
 - `--prompt --mode build|edit|plan|yolo` 保留显式覆盖，不被 headless 默认值改写。
 - 非 TTY stdin + `-p <value>` 拼接提交；TTY / 无 `-p` 不读 stdin；超大 stdin 退出 1。
 - `--timeout` 到期退出码 2；provider/API 错误退出码 1。
-- `--model provider/id` 写入 `runtimeConfig.modelSelection`；非法格式退出 1。
+- `--model provider/id` 写入带默认 `reasoningLevel` 的 `runtimeConfig.modelSelection`；非法格式退出 1。
 - `--no-session` 注入临时 sessionStore 并在结束后清理；与 `--resume`/`--continue` 互斥。
 
 CLI Browser Use 测试覆盖：

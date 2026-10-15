@@ -144,7 +144,11 @@ export interface CliResumeRequest {
 }
 
 export interface RunPromptHeadlessOptions {
-  modelSelection?: { providerId: string; modelId: string };
+  modelSelection?: {
+    providerId: string;
+    modelId: string;
+    options?: { reasoningLevel: string };
+  };
   noSession?: boolean;
   timeoutSeconds?: number;
 }

@@ -17,6 +17,25 @@ export function parseCliModelOption(value: string): CliModelSelection {
   return { providerId, modelId };
 }
 
+/**
+ * `--model` 是用户主动选型：补齐与 TUI/completeNewModelSelection 相同的默认档
+ * （catalog reasoning.values 最后一档）。无档位时不写 options，交给后续校验。
+ */
+export function completeCliModelSelection(
+  selection: CliModelSelection,
+  reasoningValues: readonly string[] | undefined,
+): ModelSelection {
+  const reasoningLevel = reasoningValues?.at(-1);
+  if (!reasoningLevel) {
+    return { providerId: selection.providerId, modelId: selection.modelId };
+  }
+  return {
+    providerId: selection.providerId,
+    modelId: selection.modelId,
+    options: { reasoningLevel },
+  };
+}
+
 /** Positive whole seconds for `--timeout`. */
 export function parseCliTimeoutSeconds(value: string): number {
   if (!/^\d+$/.test(value.trim())) {
