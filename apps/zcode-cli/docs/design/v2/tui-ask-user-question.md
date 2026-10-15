@@ -132,8 +132,8 @@ projection 中保存 `pendingUserInteractions`，用于 session resume、SDK lis
 - permission prompt 和 question prompt 分开渲染，但共用 action panel 队列。
 - question prompt 替换底部普通输入框所在区域，而不是追加在输入框之上；此时普通 prompt submit、slash command、history recall、附件粘贴等 composer 行为暂停。
 - 当同时有 permission 和 question 时，permission 优先；question 保持 pending。
-- 单问题单选：不显示 review tab，选择后直接提交。
-- 多问题或多选：显示 header tabs 和最后的 Review/Submit tab。
+- 单问题：选中选项后 Enter 立即提交，不再进入 Review answers。
+- 多问题：答完最后一题（或最后一题跳过）后立即提交，不再进入 Review answers。
 - 每个 tab 显示 `header`；已回答 tab 使用完成态标识，未回答保持 dim。
 
 ### 输入焦点模型

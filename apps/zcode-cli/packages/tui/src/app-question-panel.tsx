@@ -9,23 +9,6 @@ const h = React.createElement as (
 ) => React.ReactElement;
 
 export function QuestionPanel({ state }: { state: QuestionPromptState }): React.ReactElement {
-  if (state.reviewing) {
-    return h(
-      "box",
-      {
-        title: "Review answers",
-        style: questionPanelStyle(),
-      },
-      ...state.input.questions.map((question) =>
-        h(
-          "text",
-          { key: question.question, style: { fg: palette.text } },
-          `${question.header}: ${state.answers[question.question] ?? "(not answered)"}`,
-        ),
-      ),
-      h("text", { style: { fg: palette.muted } }, "Enter submits, Tab edits, Esc declines"),
-    );
-  }
 
   const question = state.input.questions[state.currentQuestionIndex];
   if (!question) {
@@ -94,8 +77,8 @@ export function QuestionPanel({ state }: { state: QuestionPromptState }): React.
       "text",
       { style: { fg: palette.muted } },
       question.multiSelect
-        ? "Space toggles, Enter reviews, s skips, o edits Other, Esc declines"
-        : "Enter answers, s skips, o edits Other, Esc declines",
+        ? "Space toggles, Enter submits, s skips, o edits Other, Esc declines"
+        : "Enter submits, s skips, o edits Other, Esc declines",
     ),
   );
 }

@@ -23,6 +23,7 @@ Commands:
   plugins    Manage plugins and marketplaces (\`plugins list|install|uninstall|enable|disable|update|validate|marketplace ...\`; alias: plugin)
   skills     List local skills (\`skills list\`)
   tui        Open the terminal UI
+  update     Update zcp to the latest npm version (--check to only check)
   version    Print the CLI version
 
 Options:

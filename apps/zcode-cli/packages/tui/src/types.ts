@@ -159,6 +159,7 @@ export type TuiSubmitPromptResult = {
   theme?: UiThemePreference;
   projection?: Partial<TuiContextUsage>;
   response: string;
+  exitRequested?: boolean;
   resetSessionProjection?: boolean;
   restoredMessages?: Array<{
     id?: string;

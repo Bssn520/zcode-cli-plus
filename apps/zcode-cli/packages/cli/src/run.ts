@@ -23,6 +23,7 @@ import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-comm
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
 import { armHeadlessTimeout, runPrompt, type HeadlessTimeoutArm } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
+import { runUpdateCommand } from "./update-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
 import {
@@ -482,6 +483,10 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     return 1;
   }
 
+  if (parsed.values.help === true && commandName(parsed.positionals) === "update") {
+    return await runUpdateCommand(ctx, ["--help"], version);
+  }
+
   if (parsed.values.help === true) {
     writeHelp(ctx.stdout, options.locale, options.detectedLocale);
     return 0;
@@ -703,6 +708,15 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       );
     case "skills":
       return await runSkillsCommand(ctx, options, commandDeps, parsed.positionals.slice(1));
+    case "update":
+      return await runUpdateCommand(
+        ctx,
+        [
+          ...parsed.positionals.slice(1),
+          ...(parsed.values.check === true ? ["--check"] : []),
+        ],
+        version,
+      );
     case "tui":
       return await runTuiCommand(
         ctx,

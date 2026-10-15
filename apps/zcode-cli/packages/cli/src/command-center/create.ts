@@ -88,6 +88,14 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
         };
       }
 
+      if (command.name === "quit") {
+        return {
+          exitRequested: true,
+          mode: deps.getMode?.(),
+          response: "",
+        };
+      }
+
       if (command.name === "login") {
         if (command.args.length === 0) {
           return {
