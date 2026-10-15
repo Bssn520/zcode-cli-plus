@@ -37,7 +37,7 @@ test("hides EnterPlanMode and pending AskUserQuestion rows", () => {
   assert.equal(ToolTranscriptPartView({ copy: ZH, part: tool({ toolName: "EnterPlanMode" }) }), null);
 });
 
-test("renders muted plan/question hints instead of tool chrome", () => {
+test("renders muted AskUserQuestion hint instead of tool chrome", () => {
   const answered = presentToolTranscriptPart(
     tool({
       output: JSON.stringify({ answers: { "Which option?": "Tests" } }),
@@ -46,11 +46,18 @@ test("renders muted plan/question hints instead of tool chrome", () => {
     ZH,
   );
   assert.deepEqual(answered, { kind: "hint", text: "· 已回答：Tests" });
+});
 
+test("ExitPlanMode hints stay waiting until real deny/approve", () => {
   assert.deepEqual(
     presentToolTranscriptPart(tool({ status: "pending", toolName: "ExitPlanMode" }), ZH),
     { kind: "hint", text: "· 计划已提交，等待审批…" },
   );
+  assert.deepEqual(
+    presentToolTranscriptPart(tool({ status: "running", toolName: "ExitPlanMode" }), ZH),
+    { kind: "hint", text: "· 计划已提交，等待审批…" },
+  );
+  // 审批面板打开期间消息通常已非 streaming；不能把 pending 当成拒绝。
   assert.deepEqual(presentToolTranscriptPart(tool({ toolName: "ExitPlanMode" }), ZH), {
     kind: "hint",
     text: "· 计划已批准",
@@ -68,12 +75,6 @@ test("renders muted plan/question hints instead of tool chrome", () => {
       }),
       ZH,
     ),
-    { errorPrefix: true, kind: "hint", text: "计划未批准" },
-  );
-  assert.deepEqual(
-    presentToolTranscriptPart(tool({ status: "pending", toolName: "ExitPlanMode" }), ZH, {
-      turnEnded: true,
-    }),
     { errorPrefix: true, kind: "hint", text: "计划未批准" },
   );
   assert.deepEqual(
