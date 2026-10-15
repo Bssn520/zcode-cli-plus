@@ -25,7 +25,10 @@ Tools: `EnterPlanMode`, `ExitPlanMode`, `AskUserQuestion`.
 - `ExitPlanMode`:
   - waiting (`pending` / `running`): `· 计划已提交，等待审批…`
   - approved (`completed`): `· 计划已批准`
-  - rejected/failed: `✗` in danger color + muted `计划未批准`
+  - rejected/failed (`failed` / `denied` / `cancelled`, or denial text such as
+    `Denied plan in TUI`): `✗` in danger color + muted `计划未批准`
+  - Do **not** treat non-streaming/`turnEnded` alone as rejection: the approval
+    panel waits while ExitPlanMode is still `pending`/`running`.
 
 ## Work tools
 

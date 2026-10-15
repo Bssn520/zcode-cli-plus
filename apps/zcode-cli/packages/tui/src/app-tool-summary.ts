@@ -64,7 +64,6 @@ export function summarizeAskUserAnswers(output: string | undefined): string | un
 export function presentToolTranscriptPart(
   part: ToolTranscriptPart,
   copy: TuiCopy,
-  options?: { turnEnded?: boolean },
 ): ToolRowPresentation {
   if (isEnterPlanModeTool(part.toolName)) {
     return { kind: "hidden" };
@@ -78,7 +77,7 @@ export function presentToolTranscriptPart(
   }
 
   if (isExitPlanModeTool(part.toolName)) {
-    if (isExitPlanRejected(part, options?.turnEnded === true)) {
+    if (isExitPlanRejected(part)) {
       return {
         errorPrefix: true,
         kind: "hint",
@@ -112,12 +111,11 @@ export function workToolSummaryLine(part: ToolTranscriptPart, copy: TuiCopy): st
   return `· ${body} ${copy.transcript.tools.runningMark}`;
 }
 
-function isExitPlanRejected(part: ToolTranscriptPart, turnEnded: boolean): boolean {
+function isExitPlanRejected(part: ToolTranscriptPart): boolean {
   const status = part.status as string;
   if (status === "failed" || status === "denied" || status === "cancelled") return true;
-  if (looksLikePlanDenialText(part.error) || looksLikePlanDenialText(part.output)) return true;
-  // Esc 拒绝常只发 PermissionResolved(deny)，工具行仍停在 pending；轮次结束后不能继续显示等待审批。
-  return turnEnded && (part.status === "pending" || part.status === "running");
+  // PermissionResolved(deny) / PermissionDenied 会把工具标成 failed；文本兜底覆盖迟到或冷恢复结果。
+  return looksLikePlanDenialText(part.error) || looksLikePlanDenialText(part.output);
 }
 
 function looksLikePlanDenialText(value: string | undefined): boolean {
