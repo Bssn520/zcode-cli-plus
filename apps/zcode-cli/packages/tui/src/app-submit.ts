@@ -61,10 +61,16 @@ export function appendAgentResult(
   }
   return [
     ...finalized,
-    {
-      content: result.response,
-      role: "agent",
-    },
+    result.responseFormat === "plain"
+      ? {
+          content: result.response,
+          parts: [{ format: "plain", text: result.response, type: "text" }],
+          role: "agent",
+        }
+      : {
+          content: result.response,
+          role: "agent",
+        },
   ];
 }
 
@@ -245,7 +251,8 @@ export async function submitIdleTurn(input: {
         }),
       ),
     );
-  } else {
+  } else if (!shouldHideSlashCommandFromTranscript(input.text)) {
+    // /fork 确认链是内部控制命令，按钮路径不应回显成用户消息。
     input.setMessages((current) => [
       ...current,
       { content: redactSensitivePromptForTranscript(input.text), role: "user" },
@@ -288,6 +295,10 @@ function createLocalUserMessage(content: string): Message & { id: string } {
     id: `${LOCAL_USER_MESSAGE_ID_PREFIX}-${localUserMessageSequence}`,
     role: "user",
   };
+}
+
+export function shouldHideSlashCommandFromTranscript(text: string): boolean {
+  return /^\/fork(?:\s|$)/u.test(text.trim());
 }
 
 export function redactSensitivePromptForTranscript(text: string): string {

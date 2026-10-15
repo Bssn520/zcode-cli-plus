@@ -202,6 +202,7 @@ export function AppView(props: {
         ? h(ApprovalPanel, {
             approval: props.approvalQueue[0],
             contentWidth: actionPanelContentWidth,
+            copy: props.copy,
           })
         : actionSelection
           ? h(SelectionPanel, {

@@ -23,6 +23,7 @@ import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-comm
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
 import { armHeadlessTimeout, runPrompt, type HeadlessTimeoutArm } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
+import { runUpdateCommand } from "./update-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
 import {
@@ -402,20 +403,6 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     return 1;
   }
 
-  let modelSelection: RunPromptHeadlessOptions["modelSelection"];
-  let timeoutSeconds: number | undefined;
-  try {
-    if (typeof parsed.values.model === "string") {
-      modelSelection = parseCliModelOption(parsed.values.model);
-    }
-    if (typeof parsed.values.timeout === "string") {
-      timeoutSeconds = parseCliTimeoutSeconds(parsed.values.timeout);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    ctx.stderr.write(`${message}\n`);
-    return 1;
-  }
   const env = prepareCliRuntimeEnv(deps.env ?? process.env);
   const detectedLocale = detectCliLocale(env);
   let outputFormat: GlobalOptions["outputFormat"];
@@ -434,6 +421,41 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     browserExecutable,
     outputFormat,
   );
+
+  let modelSelection: RunPromptHeadlessOptions["modelSelection"];
+  let timeoutSeconds: number | undefined;
+  try {
+    if (typeof parsed.values.model === "string") {
+      modelSelection = parseCliModelOption(parsed.values.model);
+    }
+    if (typeof parsed.values.timeout === "string") {
+      timeoutSeconds = parseCliTimeoutSeconds(parsed.values.timeout);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Headless JSON consumers need the failure on stdout, same shape as prompt-command.
+    if (
+      (typeof parsed.values.prompt === "string" || parsed.values.target !== undefined) &&
+      (options.outputFormat === "json" ||
+        options.outputFormat === "stream-json" ||
+        (options.outputFormat === undefined && options.json))
+    ) {
+      const payload = {
+        type: "result",
+        subtype: "error",
+        is_error: true,
+        error: message,
+      };
+      ctx.stdout.write(
+        options.outputFormat === "stream-json"
+          ? `${JSON.stringify(payload)}\n`
+          : formatJson(payload),
+      );
+    } else {
+      ctx.stderr.write(`${message}\n`);
+    }
+    return 1;
+  }
   const forceMcs = parsed.values["force-mcs"] === true;
   let targetRequest: CliTargetRequest | undefined;
   try {
@@ -459,6 +481,10 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
   ) {
     ctx.stderr.write(`${SURFACE_SCOPE_ERROR}\n`);
     return 1;
+  }
+
+  if (parsed.values.help === true && commandName(parsed.positionals) === "update") {
+    return await runUpdateCommand(ctx, ["--help"], version);
   }
 
   if (parsed.values.help === true) {
@@ -682,6 +708,15 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       );
     case "skills":
       return await runSkillsCommand(ctx, options, commandDeps, parsed.positionals.slice(1));
+    case "update":
+      return await runUpdateCommand(
+        ctx,
+        [
+          ...parsed.positionals.slice(1),
+          ...(parsed.values.check === true ? ["--check"] : []),
+        ],
+        version,
+      );
     case "tui":
       return await runTuiCommand(
         ctx,

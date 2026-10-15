@@ -5,9 +5,7 @@ import type { PlanApprovalState } from "./app-model.js";
 import { palette } from "./app-model.js";
 import { MarkdownText } from "./app-markdown.js";
 import { extractMermaidBlocks } from "./app-mermaid-preview.js";
-import { isPlanDraftModified } from "./app-plan-approval-state.js";
 import { wrapPlanApprovalHints } from "./app-plan-approval-hints.js";
-import { parsePlanPreview } from "./app-plan-parse.js";
 import { setActivePlanPreviewScroll } from "./app-plan-preview-scroll.js";
 import type { TuiCopy } from "@zcode/i18n";
 import { DEFAULT_TUI_COPY } from "./app-locale.js";
@@ -134,108 +132,44 @@ export function PlanApprovalPanelView({
   state: PlanApprovalState;
 }): React.ReactElement {
   const text = copy.planApproval;
-  if (state.mode === "comment") {
-    const targetLabel =
-      state.commentTarget?.kind === "step"
-        ? text.commentStepTitle(state.commentTarget.stepIndex + 1)
-        : text.commentOverallTitle;
-    const rows = [
-      textRow("buffer", `> ${state.commentBuffer}`, palette.accent),
-      textRow("help", text.commentHelp, palette.muted),
-    ];
-    return h(
-      "box",
-      {
-        title: targetLabel,
-        style: panelStyle(PLAN_APPROVAL_PANEL_CHROME_ROWS + rows.length),
-      },
-      ...rows,
-    );
-  }
-
-  if (state.mode === "review") {
-    const rows = [
-      ...state.comments.map((comment, index) =>
-        textRow(
-          comment.id,
-          `${index === state.selectedCommentIndex ? ">" : " "} ${formatComment(comment, text)}`,
-          index === state.selectedCommentIndex ? palette.accent : palette.text,
-        ),
-      ),
-      textRow("help", text.reviewHelp, palette.muted),
-    ];
-    return h(
-      "box",
-      {
-        title: text.reviewTitle,
-        style: panelStyle(PLAN_APPROVAL_PANEL_CHROME_ROWS + rows.length),
-      },
-      ...rows,
-    );
-  }
-
-  const parsed = parsePlanPreview(state.draftPlan);
-  const edited = isPlanDraftModified(state);
   const hasMermaid = extractMermaidBlocks(state.draftPlan).length > 0;
-  const headerRows: React.ReactElement[] = [
-    textRow("prompt", text.prompt, palette.warning),
-  ];
-
-  if (parsed.splittable) {
-    if (parsed.steps.length > 0) {
-      headerRows.push(textRow("steps-h", text.stepsHeading, palette.muted));
-      for (const [index, step] of parsed.steps.entries()) {
-        const selected = index === state.selectedStepIndex;
-        const note = state.comments.find(
-          (comment) => comment.kind === "step" && comment.stepIndex === index,
-        );
-        headerRows.push(
-          textRow(
-            `step-${index}`,
-            `${selected ? ">" : " "} ${index + 1}. ${step}${note ? `  [${text.noteMarker}]` : ""}`,
-            selected ? palette.accent : palette.text,
-          ),
-        );
-      }
-    }
-    if (parsed.files.length > 0) {
-      headerRows.push(textRow("files-h", text.filesHeading, palette.muted));
-      for (const [index, file] of parsed.files.entries()) {
-        headerRows.push(textRow(`file-${index}`, `  • ${file}`, palette.text));
-      }
-    }
-    if (parsed.risks.length > 0) {
-      headerRows.push(textRow("risks-h", text.risksHeading, palette.muted));
-      for (const [index, risk] of parsed.risks.entries()) {
-        headerRows.push(textRow(`risk-${index}`, `  ! ${risk}`, palette.warning));
-      }
-    }
-  }
-
-  headerRows.push(textRow("preview-h", text.previewHeading, palette.muted));
-  if (hasMermaid) {
-    headerRows.push(textRow("mermaid-hint", text.mermaidHint, palette.muted));
-  }
+  const feedbackBody =
+    state.feedbackBuffer.length > 0 ? state.feedbackBuffer : text.feedbackPlaceholder;
+  const feedbackFocused = state.focus === "feedback";
+  const approveFocused = state.focus === "approve";
 
   const footerRows: React.ReactElement[] = [];
   if (state.statusMessage) {
     footerRows.push(textRow("status", state.statusMessage, palette.warning));
   }
-  const footerBits = [
-    edited ? text.editedBadge : undefined,
-    parsed.steps.length > 0 ? text.stepCount(parsed.steps.length) : undefined,
-    state.comments.length > 0 ? text.commentCount(state.comments.length) : undefined,
-  ].filter(Boolean);
-  if (footerBits.length > 0) {
-    footerRows.push(textRow("meta", footerBits.join(" · "), palette.muted));
-  }
+  footerRows.push(
+    textRow(
+      "approve",
+      `${approveFocused ? ">" : " "} ${text.approveLabel}`,
+      approveFocused ? palette.accent : palette.text,
+    ),
+  );
+  footerRows.push(
+    textRow(
+      "feedback",
+      `${feedbackFocused ? ">" : " "} ${feedbackBody}`,
+      feedbackFocused
+        ? state.feedbackBuffer.length > 0
+          ? palette.accent
+          : palette.muted
+        : state.feedbackBuffer.length > 0
+          ? palette.text
+          : palette.muted,
+    ),
+  );
+
   const rowContentWidth = normalizePlanApprovalContentWidth(contentWidth);
-  const helpLines = wrapPlanApprovalHints(text.help(state.comments.length), rowContentWidth);
+  const helpLines = wrapPlanApprovalHints(text.help(hasMermaid), rowContentWidth);
   for (const [index, line] of helpLines.entries()) {
     footerRows.push(textRow(`help-${index}`, line, palette.muted));
   }
 
-  const fixedRows = headerRows.length + footerRows.length;
+  const fixedRows = footerRows.length;
   const naturalPreviewHeight = Math.max(
     PLAN_APPROVAL_MIN_PREVIEW_HEIGHT,
     measuredPreviewHeight ?? estimatePlanPreviewRows(state.draftPlan),
@@ -247,7 +181,6 @@ export function PlanApprovalPanelView({
   return h(
     "box",
     { title: text.title, style: panelStyle(panelHeight) },
-    ...headerRows,
     h(
       "scrollbox",
       {
@@ -298,20 +231,6 @@ function textRow(key: string, body: string, fg: string): React.ReactElement {
   return h("text", { key, style: { ...PLAN_TEXT_ROW_STYLE, fg } }, body);
 }
 
-function formatComment(
-  comment: PlanApprovalState["comments"][number],
-  text: TuiCopy["planApproval"],
-): string {
-  if (comment.kind === "step") {
-    return text.stepCommentSummary({
-      index: (comment.stepIndex ?? 0) + 1,
-      label: comment.stepLabel ?? "",
-      text: comment.text,
-    });
-  }
-  return text.overallCommentSummary(comment.text);
-}
-
 function normalizePlanApprovalContentWidth(contentWidth: number | undefined): number {
   if (contentWidth === undefined || !Number.isFinite(contentWidth)) {
     return PLAN_APPROVAL_FALLBACK_CONTENT_WIDTH;
@@ -326,7 +245,7 @@ function planApprovalPreviewHeight(
 ): number {
   const remaining =
     Math.floor(maxHeight) - PLAN_APPROVAL_PANEL_CHROME_ROWS - fixedRows;
-  // 固定行不够放时宁可顶到 transcript，也不压缩 header/footer。
+  // 固定行不够放时宁可顶到 transcript，也不压缩 footer。
   if (remaining < PLAN_APPROVAL_MIN_PREVIEW_HEIGHT) {
     return PLAN_APPROVAL_MIN_PREVIEW_HEIGHT;
   }

@@ -3,11 +3,51 @@ import test from "node:test";
 import { SessionEventType, type SessionEvent } from "@zcode/contracts";
 import type { Message, ToolTranscriptPart } from "../src/app-model.js";
 import {
+  applyToolPermissionDenial,
   applyToolTranscriptEvent,
   buildToolTranscriptProjection,
 } from "../src/app-tool-transcript.js";
 import { formatToolFilePath } from "../src/app-tool-path-display.js";
-import { ToolTranscriptPartView } from "../src/app-tool-components.js";
+import { ToolTranscriptPartFrame } from "../src/app-tool-components.js";
+import { presentToolTranscriptPart, workToolSummaryLine } from "../src/app-tool-summary.js";
+import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
+test("permission denial marks ExitPlanMode as failed", () => {
+  const state: { messages: Message[] } = { messages: [] };
+  const toolNamesById = new Map<string, string>();
+  const handlers = {
+    setMessages: (updater: (current: Message[]) => Message[]) => {
+      state.messages = updater(state.messages);
+    },
+    toolNamesById,
+  };
+
+  applyToolTranscriptEvent(
+    sessionEvent(SessionEventType.ToolCallScheduled, {
+      input: { plan: "# plan" },
+      toolCallId: "call-plan",
+      toolName: "ExitPlanMode",
+    }),
+    handlers as never,
+  );
+  applyToolPermissionDenial(
+    {
+      decision: "deny",
+      reason: "Denied plan in TUI",
+      toolCallId: "call-plan",
+    },
+    handlers as never,
+  );
+
+  const part = onlyToolPart(state.messages);
+  assert.equal(part.status, "failed");
+  assert.equal(part.error, "Denied plan in TUI");
+  assert.deepEqual(presentToolTranscriptPart(part, DEFAULT_TUI_COPY), {
+    errorPrefix: true,
+    kind: "hint",
+    text: "Plan not approved",
+  });
+});
+
 
 test("formats Read paths relative to the workspace", () => {
   assert.equal(
@@ -75,7 +115,7 @@ test("keeps workspace-external Edit paths absolute", () => {
   assert.equal(projection.title, "Edit /workspace/other/App.jsx");
 });
 
-test("renders Read errors under the path title with error styling", () => {
+test("renders Read errors as a collapsed failure summary by default", () => {
   const state = createToolProjectionState("/workspace/project");
   state.apply(
     sessionEvent(SessionEventType.ToolCallScheduled, {
@@ -101,14 +141,21 @@ test("renders Read errors under the path title with error styling", () => {
   assert.equal(part.status, "failed");
   assert.equal(part.error, "File not found: /workspace/project/does-not-exist.js");
 
-  const lines = collectTextNodes(ToolTranscriptPartView({ part }));
-  assert.equal(lines[0]?.text, "Read does-not-exist.js");
+  const summary = workToolSummaryLine(part, DEFAULT_TUI_COPY);
+  const lines = collectTextNodes(
+    ToolTranscriptPartFrame({
+      expanded: false,
+      onToggle() {},
+      part,
+      summary,
+    }),
+  );
+  assert.equal(lines.length, 1);
+  assert.match(lines[0]?.text ?? "", /^\+ · read does-not-exist\.js ✗ /u);
   assert.equal(lines[0]?.style.fg, "#94a3b8");
-  assert.equal(lines[1]?.text, "File not found: /workspace/project/does-not-exist.js");
-  assert.equal(lines[1]?.style.fg, "#fca5a5");
 });
 
-test("renders tool rows without a global left gutter", () => {
+test("renders work tool rows as a collapsed summary without a global left gutter", () => {
   const part: ToolTranscriptPart = {
     detailLines: ["command: npm test", "cwd: packages/tui"],
     status: "running",
@@ -117,13 +164,18 @@ test("renders tool rows without a global left gutter", () => {
     type: "tool",
   };
 
-  const view = ToolTranscriptPartView({ part });
+  const summary = workToolSummaryLine(part, DEFAULT_TUI_COPY);
+  const view = ToolTranscriptPartFrame({
+    expanded: false,
+    onToggle() {},
+    part,
+    summary,
+  });
   const lines = collectTextNodes(view);
 
   assert.equal((view.props.style as Record<string, unknown>).paddingLeft, undefined);
-  assert.equal(lines[0]?.text, "Tool Bash running");
-  assert.equal(lines[1]?.text, "  command: npm test");
-  assert.equal(lines[2]?.text, "  cwd: packages/tui");
+  assert.equal(lines[0]?.text, "+ · run npm test …");
+  assert.equal(lines.length, 1);
 });
 
 function createToolProjectionState(workspaceDirectory: string): {
@@ -147,6 +199,7 @@ function createToolProjectionState(workspaceDirectory: string): {
     },
   };
 }
+
 
 function onlyToolPart(messages: Message[]): ToolTranscriptPart {
   const part = messages[0]?.parts?.[0];

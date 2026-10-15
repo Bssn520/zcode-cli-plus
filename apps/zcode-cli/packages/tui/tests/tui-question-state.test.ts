@@ -28,7 +28,7 @@ const input: AskUserQuestionInput = {
   ],
 };
 
-test("skips an intermediate question and submits only the later answer", () => {
+test("skips an intermediate question and submits on the last answer", () => {
   const harness = createHarness();
 
   harness.press("s");
@@ -36,15 +36,13 @@ test("skips an intermediate question and submits only the later answer", () => {
   assert.deepEqual(harness.state.answers, {});
 
   harness.press("return");
-  assert.equal(harness.state.reviewing, true);
-  assert.deepEqual(harness.state.answers, { "Which safeguard?": "Tests" });
-  harness.press("return");
 
   assert.deepEqual(harness.result?.modifiedInput, {
     annotations: {},
     answers: { "Which safeguard?": "Tests" },
     questions: input.questions,
   });
+  assert.equal(harness.queueLength, 0);
 });
 
 test("submits zero answers after every question is skipped", () => {
@@ -52,38 +50,54 @@ test("submits zero answers after every question is skipped", () => {
 
   harness.press("s");
   harness.press("s");
-  assert.equal(harness.state.reviewing, true);
-  harness.press("return");
 
   assert.deepEqual(harness.result?.modifiedInput, {
     annotations: {},
     answers: {},
     questions: input.questions,
   });
+  assert.equal(harness.queueLength, 0);
 });
 
-test("returns from review and supplements a previously skipped answer", () => {
-  const harness = createHarness();
-
-  harness.press("s");
-  harness.press("s");
-  harness.press("tab");
-  assert.equal(harness.state.currentQuestionIndex, 0);
-  assert.equal(harness.state.reviewing, false);
+test("single question submits immediately without a review step", () => {
+  const single: AskUserQuestionInput = {
+    questions: [input.questions[0]!],
+  };
+  const harness = createHarness(single);
 
   harness.press("down");
-  harness.press("return");
-  harness.press("s");
   harness.press("return");
 
   assert.deepEqual(harness.result?.modifiedInput, {
     annotations: {},
     answers: { "Which approach?": "Safe" },
+    questions: single.questions,
+  });
+  assert.equal(harness.queueLength, 0);
+});
+
+test("multi-question answers submit when the last question is answered", () => {
+  const harness = createHarness();
+
+  harness.press("down");
+  harness.press("return");
+  assert.equal(harness.state.currentQuestionIndex, 1);
+  assert.equal(harness.result, undefined);
+
+  harness.press("return");
+
+  assert.deepEqual(harness.result?.modifiedInput, {
+    annotations: {},
+    answers: {
+      "Which approach?": "Safe",
+      "Which safeguard?": "Tests",
+    },
     questions: input.questions,
   });
 });
 
-function createHarness(): {
+function createHarness(questionInput: AskUserQuestionInput = input): {
+  readonly queueLength: number;
   readonly result: PermissionBrokerResult | undefined;
   readonly state: NonNullable<ApprovalPrompt["questionState"]>;
   press: (name: string) => void;
@@ -92,7 +106,7 @@ function createHarness(): {
   let queue: ApprovalPrompt[] = [];
   const approval: ApprovalPrompt = {
     cleanup: () => undefined,
-    questionState: createQuestionPromptState(input),
+    questionState: createQuestionPromptState(questionInput),
     reject: () => undefined,
     request: {} as ApprovalPrompt["request"],
     resolve: (value) => {
@@ -106,6 +120,9 @@ function createHarness(): {
   };
 
   return {
+    get queueLength() {
+      return queue.length;
+    },
     get result() {
       return result;
     },

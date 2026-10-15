@@ -30,11 +30,36 @@ const messages: Message[] = [
   { id: "msg_a3", role: "agent", content: "third" },
 ];
 
-test("only completed agent messages with ids are forkable", () => {
+test("only the turn-final completed agent text message is forkable in the action bar", () => {
   assert.equal(isForkableAgentMessage(messages[1]), true);
   assert.equal(isForkableAgentMessage(messages[2]), false);
-  assert.equal(shouldRenderMessageActionBar(messages[3]!), true);
-  assert.equal(shouldRenderMessageActionBar(messages[0]!), false);
+  assert.equal(shouldRenderMessageActionBar(messages, 1), false);
+  assert.equal(shouldRenderMessageActionBar(messages, 3), true);
+  assert.equal(shouldRenderMessageActionBar(messages, 0), false);
+});
+
+test("tool-only agent messages are not forkable", () => {
+  const toolOnly: Message[] = [
+    { id: "msg_user", role: "user", content: "hi" },
+    {
+      id: "msg_tools",
+      role: "agent",
+      content: "",
+      parts: [
+        {
+          detailLines: ["command: npm test"],
+          status: "completed",
+          toolCallId: "call-1",
+          toolName: "Bash",
+          type: "tool",
+        },
+      ],
+    },
+    { id: "msg_final", role: "agent", content: "done" },
+  ];
+  assert.equal(isForkableAgentMessage(toolOnly[1]), false);
+  assert.equal(shouldRenderMessageActionBar(toolOnly, 1), false);
+  assert.equal(shouldRenderMessageActionBar(toolOnly, 2), true);
 });
 
 test("Ctrl+Shift+F enters focus on the latest forkable row", () => {
@@ -80,6 +105,43 @@ test("Enter on focused Fork submits /fork msg_<id> for confirm", () => {
     command: forkCommandForMessage("msg_a1"),
   });
   assert.equal(forkCommandForMessage("msg_a1"), "/fork msg_a1");
+});
+
+
+test("fork slash commands are hidden from the local transcript echo", async () => {
+  const { shouldHideSlashCommandFromTranscript, appendAgentResult } = await import(
+    "../src/app-submit.js"
+  );
+  assert.equal(shouldHideSlashCommandFromTranscript("/fork msg_a1"), true);
+  assert.equal(shouldHideSlashCommandFromTranscript("/fork msg_a1 --confirm"), true);
+  assert.equal(shouldHideSlashCommandFromTranscript("please fork this"), false);
+
+  const messages = appendAgentResult(
+    [
+      { content: "old prompt", role: "user" },
+      { content: "old answer", role: "agent" },
+      { content: "/fork msg_a1 --confirm", role: "user" },
+    ],
+    {
+      resetSessionProjection: true,
+      response: "已 Fork 到新会话：[Fork] 原标题",
+      responseFormat: "plain",
+      restoredMessages: [
+        { content: "before", role: "user" },
+        { id: "msg_a1", content: "fork point", role: "agent" },
+      ],
+    },
+  );
+  assert.deepEqual(messages, [
+    { content: "before", role: "user" },
+    { id: "msg_a1", content: "fork point", role: "agent" },
+    {
+      content: "已 Fork 到新会话：[Fork] 原标题",
+      parts: [{ format: "plain", text: "已 Fork 到新会话：[Fork] 原标题", type: "text" }],
+      role: "agent",
+    },
+  ]);
+  assert.ok(!messages.some((message) => /\/fork/.test(message.content)));
 });
 
 test("Esc clears message action focus without activating", () => {

@@ -34,13 +34,16 @@ type ApprovalTextRow = {
 export function ApprovalPanel({
   approval,
   contentWidth,
+  copy,
 }: {
   approval: ApprovalPrompt;
   contentWidth?: number;
+  copy?: import("@zcode/i18n").TuiCopy;
 }): React.ReactElement {
   if (approval.planApprovalState) {
     return h(PlanApprovalPanel, {
       contentWidth,
+      copy,
       state: approval.planApprovalState,
     });
   }

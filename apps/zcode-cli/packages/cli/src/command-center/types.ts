@@ -93,6 +93,8 @@ export type CommandCenterForkResult = {
   response: string;
   restoredFileCount?: number;
   restoredFiles?: unknown[];
+  /** CLI 层重命名后的标题，形如 `[Fork] <原标题>`。 */
+  title?: string;
 };
 
 export type CommandCenterCheckpoint = {

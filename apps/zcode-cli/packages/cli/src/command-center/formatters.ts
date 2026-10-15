@@ -1,4 +1,4 @@
-import type { CommandCenterApp } from "./types.js";
+import type { CommandCenterApp, CommandCenterForkResult } from "./types.js";
 
 export function formatResumeResult(
   sessionId: string,
@@ -13,4 +13,10 @@ export function formatResumeResult(
 
 export function formatNewSessionResult(sessionId: string): string {
   return `Started new session ${sessionId}.`;
+}
+
+export function formatForkSwitchResult(result: CommandCenterForkResult): string {
+  const title = result.title?.trim() || result.forkedSessionId;
+  // tip 在 TUI 以 plain text 渲染；勿 Markdown 转义——OpenTUI conceal 不吃 \[，反斜杠会原样显示
+  return `已 Fork 到新会话：${title}`;
 }

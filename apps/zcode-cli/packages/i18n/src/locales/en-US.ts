@@ -23,6 +23,7 @@ Commands:
   plugins    Manage plugins and marketplaces (\`plugins list|install|uninstall|enable|disable|update|validate|marketplace ...\`; alias: plugin)
   skills     List local skills (\`skills list\`)
   tui        Open the terminal UI
+  update     Update zcp to the latest npm version (--check to only check)
   version    Print the CLI version
 
 Options:
@@ -320,6 +321,25 @@ Slash Commands:
         busyHint: "wait until current reply finishes",
         fork: "Fork",
       },
+      tools: {
+        answered: (summary) => `· Answered: ${summary}`,
+        bash: (command) => `run ${command}`,
+        collapsedStatus: "Tool details collapsed. Ctrl+E to expand.",
+        edit: (path) => `edit ${path}`,
+        exitCode: (code) => `exit code ${code}`,
+        expandedStatus: "Tool details expanded. Ctrl+E to collapse.",
+        failMark: "✗",
+        generic: (name) => name,
+        glob: (pattern) => `glob ${pattern}`,
+        grep: (pattern) => `search ${pattern}`,
+        planApproved: "· Plan approved",
+        planRejected: "Plan not approved",
+        planSubmitted: "· Plan submitted, waiting for approval…",
+        read: (path) => `read ${path}`,
+        runningMark: "…",
+        successMark: "✓",
+        write: (path) => `write ${path}`,
+      },
       title: "Transcript",
       workflow: {
         actors: "actors:",
@@ -371,34 +391,13 @@ Slash Commands:
     },
     planApproval: {
       title: "Plan approval",
-      prompt: "Exit plan mode and start implementation?",
-      stepsHeading: "Steps",
-      filesHeading: "Files",
-      risksHeading: "Risks",
-      previewHeading: "Preview",
-      editedBadge: "edited",
-      noteMarker: "note",
-      stepCount: (count) => `${count} ${count === 1 ? "step" : "steps"}`,
-      commentCount: (count) => `${count} ${count === 1 ? "comment" : "comments"}`,
-      help: (commentCount) =>
-        commentCount > 0
-          ? `Ctrl+G edit · f step comment · g overall · r review · Enter send feedback (${commentCount} ${commentCount === 1 ? "comment" : "comments"}) · Esc cancel · j/k select · PgUp/PgDn scroll preview · o open Mermaid`
-          : "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select · PgUp/PgDn scroll preview · o open Mermaid",
-      mermaidHint: "Mermaid found: press o to open in browser",
+      approveLabel: "Approve",
+      feedbackPlaceholder: "Enter revision feedback, press Enter to send to the agent…",
+      help: (hasMermaid) =>
+        hasMermaid ? "PgUp/PgDn scroll · o open Mermaid" : "PgUp/PgDn scroll",
       mermaidNone: "No Mermaid code blocks in this plan",
       mermaidOpenFailed: (message) => `Could not open Mermaid preview: ${message}`,
       mermaidOpened: "Opened Mermaid preview in browser",
-      commentStepTitle: (index) => `Feedback on step ${index}`,
-      commentOverallTitle: "Overall plan feedback",
-      commentHelp: "Enter attaches · Esc back",
-      reviewTitle: "Review comments",
-      reviewHelp: "Enter send feedback · d delete · Esc back · j/k select",
-      stepCommentSummary: ({ index, label, text }) => `[step ${index}] ${label}: ${text}`,
-      overallCommentSummary: (text) => `[general] ${text}`,
-      editorNotFound: "No editor found: set $VISUAL or $EDITOR",
-      editorFailed: (message) => `Could not open editor: ${message}`,
-      feedbackModifiedPlan: (plan) =>
-        `User modified the plan. The updated plan is as follows:\n${plan}`,
     },
   },
 };

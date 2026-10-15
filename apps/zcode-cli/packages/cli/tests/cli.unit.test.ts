@@ -2313,7 +2313,8 @@ test("wires TUI fork command into a new active app", async () => {
       const forked = await options.submitPrompt("/fork checkpoint_1", {
         abortSignal: new AbortController().signal,
       });
-      assert.match(forked.response, /Switched to forked session sess_child/);
+      assert.equal(forked.resetSessionProjection, true);
+      assert.match(forked.response, /已 Fork 到新会话：/);
 
       const promptResult = await options.submitPrompt("hello fork", {
         abortSignal: new AbortController().signal,
@@ -3433,7 +3434,8 @@ test("command center forks and switches the active app", async () => {
   });
 
   assert.deepEqual(forkTarget, { targetCheckpointId: "checkpoint_1" });
-  assert.equal(result.response, "Forked session sess_child");
+  assert.equal(result.resetSessionProjection, true);
+  assert.equal(result.response, "已 Fork 到新会话：sess_child");
 });
 
 test("command center opens a checkpoint picker for bare fork", async () => {
@@ -3639,7 +3641,17 @@ test("command center confirmed message fork calls forkApp with targetMessageId",
   });
 
   assert.deepEqual(forkTarget, { targetMessageId: "msg_agent_1" });
-  assert.equal(result.response, "Forked session sess_child");
+  assert.equal(result.resetSessionProjection, true);
+  assert.equal(result.response, "已 Fork 到新会话：sess_child");
+  assert.deepEqual(result.restoredMessages, [
+    { id: "msg_agent_1", role: "agent", content: "first reply" },
+    {
+      id: "msg_agent_2",
+      role: "agent",
+      content: "updated",
+      parts: [{ type: "tool", toolName: "Write", input: { file_path: "src/app.ts" } }],
+    },
+  ]);
 });
 
 test("command center /fork latest still uses checkpoint fork without confirm", async () => {
@@ -3673,7 +3685,8 @@ test("command center /fork latest still uses checkpoint fork without confirm", a
   });
 
   assert.equal(forkTarget, undefined);
-  assert.equal(result.response, "Forked session sess_child");
+  assert.equal(result.resetSessionProjection, true);
+  assert.equal(result.response, "已 Fork 到新会话：sess_child");
   assert.equal(result.selection, undefined);
 });
 
@@ -4189,6 +4202,10 @@ test("prints help with help flag", async () => {
   assert.equal(exitCode, 0);
   assert.match(ctx.stdout.output(), /With no command, zcode opens the full-screen TUI\./);
   assert.match(ctx.stdout.output(), /Commands:/);
+  assert.match(
+    ctx.stdout.output(),
+    /update\s+Update zcp to the latest npm version \(--check to only check\)/,
+  );
   assert.match(ctx.stdout.output(), /--force-mcs/);
   assert.match(ctx.stdout.output(), /--surface <surface>/);
   assert.match(ctx.stdout.output(), /--resume <sessionId>/);

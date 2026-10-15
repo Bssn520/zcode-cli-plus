@@ -241,6 +241,14 @@ export function parseSlashCommand(input: string): SlashCommand | null {
       type: "known",
     };
   }
+  if (rawName === "quit" || rawName === "q") {
+    return {
+      args,
+      name: "quit",
+      rawName,
+      type: "known",
+    };
+  }
 
   return {
     args,

@@ -15,11 +15,15 @@ import {
 import {
   IMAGE_THUMB_COLUMNS,
   IMAGE_THUMB_ROWS,
+  OVERLAY_REDRAW_DEBOUNCE_MS,
+  buildKittyOverlayUpdateSequence,
   buildOverlayClearSequence,
   buildOverlayDrawSequence,
+  createKittyTransmitState,
   dataUrlBase64,
   overlaySignature,
   shouldRedrawOverlay,
+  type KittyTransmitState,
   type OverlayDrawState,
   type OverlaySlot,
 } from "./terminal-image-overlay.js";
@@ -42,6 +46,8 @@ export function ImageAttachmentBar({
   const renderer = useRenderer();
   const slotRefs = React.useRef(new Map<number, BoxRenderable>());
   const lastSignatureRef = React.useRef<string | null>(null);
+  const lastSlotsRef = React.useRef<readonly OverlaySlot[] | null>(null);
+  const kittyTransmitRef = React.useRef<KittyTransmitState>(createKittyTransmitState());
   const protocolRef = React.useRef(protocol);
   const imagesRef = React.useRef(images);
   protocolRef.current = protocol;
@@ -49,6 +55,9 @@ export function ImageAttachmentBar({
 
   React.useEffect(() => {
     if (protocol === "none") return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    let pendingState: OverlayDrawState | undefined;
 
     const writeStdout = (sequence: string | undefined): void => {
       if (!sequence) return;
@@ -58,9 +67,26 @@ export function ImageAttachmentBar({
     const clearOverlay = (): void => {
       const active = protocolRef.current;
       if (active !== "none") {
-        writeStdout(buildOverlayClearSequence(active));
+        writeStdout(buildOverlayClearSequence(active, process.env, kittyTransmitRef.current));
       }
       lastSignatureRef.current = null;
+      lastSlotsRef.current = null;
+    };
+
+    const flushOverlay = (state: OverlayDrawState): void => {
+      if (state.protocol === "kitty") {
+        writeStdout(
+          buildKittyOverlayUpdateSequence(
+            lastSlotsRef.current,
+            state.slots,
+            kittyTransmitRef.current,
+          ),
+        );
+      } else {
+        writeStdout(buildOverlayDrawSequence(state));
+      }
+      lastSlotsRef.current = state.slots;
+      lastSignatureRef.current = overlaySignature(state);
     };
 
     const onFrame = (): void => {
@@ -84,9 +110,17 @@ export function ImageAttachmentBar({
       }
 
       if (slots.length === 0) {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          debounceTimer = undefined;
+        }
+        pendingState = undefined;
         if (lastSignatureRef.current !== null) {
-          writeStdout(buildOverlayClearSequence(activeProtocol));
+          writeStdout(
+            buildOverlayClearSequence(activeProtocol, process.env, kittyTransmitRef.current),
+          );
           lastSignatureRef.current = null;
+          lastSlotsRef.current = null;
         }
         return;
       }
@@ -95,18 +129,35 @@ export function ImageAttachmentBar({
       const signature = overlaySignature(state);
       if (!shouldRedrawOverlay(lastSignatureRef.current, signature)) return;
 
-      if (activeProtocol === "kitty" && lastSignatureRef.current !== null) {
-        writeStdout(buildOverlayClearSequence(activeProtocol));
+      // First paint is immediate; later position/content updates are debounced.
+      if (lastSignatureRef.current === null) {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          debounceTimer = undefined;
+        }
+        pendingState = undefined;
+        flushOverlay(state);
+        return;
       }
-      writeStdout(buildOverlayDrawSequence(state));
-      lastSignatureRef.current = signature;
+
+      pendingState = state;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = undefined;
+        const next = pendingState;
+        pendingState = undefined;
+        if (!next) return;
+        if (!shouldRedrawOverlay(lastSignatureRef.current, overlaySignature(next))) return;
+        flushOverlay(next);
+      }, OVERLAY_REDRAW_DEBOUNCE_MS);
     };
 
     // FRAME fires after renderNative; postProcess runs too early for graphics.
     renderer.on(CliRenderEvents.FRAME, onFrame);
     return () => {
       renderer.off(CliRenderEvents.FRAME, onFrame);
-      if (lastSignatureRef.current !== null) clearOverlay();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (lastSignatureRef.current !== null || pendingState) clearOverlay();
     };
   }, [protocol, renderer]);
 

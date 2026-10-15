@@ -10,6 +10,38 @@
   - Plan 模式下审批前可完整预览计划，并可附修改意见拒绝。
 - 定期跟进上游 tag（当前：见 [`UPSTREAM_TAG`](UPSTREAM_TAG)）。
 
+## 0.2.1 新功能
+
+### AskUserQuestion
+
+- 选完选项后直接提交，不再多一步确认。
+
+### 计划审批
+
+- 简化为「批准」按钮 + 修改意见输入框。
+- `Tab` / `↑↓` 在按钮与输入框间切换；输入框回车发送反馈，agent 改计划后重新弹出审批；`Esc` 拒绝。
+
+### 对话降噪
+
+- 隐藏计划 / 提问工具行。
+- 工作工具折叠为一行摘要，可展开查看详情。
+
+### Fork 会话
+
+- Fork 后自动切换并重绘到新会话；标题为 `[Fork] 原标题`。
+
+### 命令与快捷键
+
+- `zcp update`（支持 `--check`）。
+- `/quit`、`/q` 退出。
+- 修复输入框发送后不清空，以及 `Ctrl+U`。
+
+### 其他修复
+
+- kitty 缩略图闪烁修复。
+- 未配置模型时，`--json` / json 输出错误改为合法 JSON。
+- `--no-session` 不再写入 rollout 日志。
+
 ## 0.2.0 新功能
 
 ### 图片输入
@@ -91,6 +123,38 @@ node apps/zcode-cli/packages/cli/dist/zcode.cjs --help
 - npm package: `@bssn520/zcode-cli-plus`; command name: `zcp`.
 - Build: Node 24 + pnpm 10.33.2, `pnpm install --frozen-lockfile && pnpm --filter zcode-cli build`.
 - License: Apache-2.0, with upstream NOTICE and third-party notices preserved.
+
+### What's new in 0.2.1
+
+**AskUserQuestion**
+
+- Selecting an option submits immediately (no extra confirm step).
+
+**Plan approval**
+
+- Simplified to an Approve button + revision feedback input.
+- `Tab` / `↑↓` switch between button and input; Enter in the input sends feedback so the agent revises the plan and reopens approval; `Esc` rejects.
+
+**Quieter chat**
+
+- Hide plan / question tool rows.
+- Collapse work tools to a one-line summary that can be expanded.
+
+**Fork session**
+
+- After fork, auto-switch and redraw into the new session; title becomes `[Fork] original title`.
+
+**Commands & shortcuts**
+
+- `zcp update` (with `--check`).
+- `/quit`, `/q` to exit.
+- Fix draft not clearing after send, and `Ctrl+U`.
+
+**Other fixes**
+
+- Fix kitty thumbnail flicker.
+- When no model is configured, `--json` / json output errors are valid JSON.
+- `--no-session` no longer writes rollout logs.
 
 ### What's new in 0.2.0
 
