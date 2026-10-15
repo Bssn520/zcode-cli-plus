@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildAssistantMessageSelection,
   buildForkConfirmSelection,
+  buildForkSwitchResult,
   parseForkTarget,
   timestampFromMessageId,
 } from "../src/command-center/fork-message.js";
@@ -73,4 +74,49 @@ test("timestampFromMessageId reads sortable msg ids", () => {
   const messageId = `msg_${now.toString(36)}_deadbeef`;
   assert.equal(timestampFromMessageId(messageId), now);
   assert.equal(timestampFromMessageId("msg_abc"), undefined);
+});
+
+
+test("buildForkSwitchResult reloads child transcript and formats tip title", async () => {
+  const result = await buildForkSwitchResult(
+    {
+      forkApp: async () => {
+        throw new Error("forkApp should not run");
+      },
+      getApp: async () =>
+        ({
+          sessionId: "sess_child",
+          traceId: "trace-child",
+          getLocale: () => "zh-CN",
+          getModel: () => "glm",
+          getThoughtLevel: () => "high",
+          loadSessionTranscript: async () => [
+            { id: "msg_user", role: "user", content: "before fork" },
+            { id: "msg_agent_1", role: "agent", content: "fork point" },
+          ],
+          resume: async () => {
+            throw new Error("resume should not run");
+          },
+          submitPrompt: async () => {
+            throw new Error("prompt should not run");
+          },
+        }) as never,
+      resumeApp: async () => {
+        throw new Error("resume should not run");
+      },
+    },
+    {
+      forkedSessionId: "sess_child",
+      response: "ignored raw fork response",
+      title: "[Fork] 原标题",
+    },
+  );
+
+  assert.equal(result.resetSessionProjection, true);
+  assert.equal(result.response, "已 Fork 到新会话：[Fork] 原标题");
+  assert.deepEqual(result.restoredMessages, [
+    { id: "msg_user", role: "user", content: "before fork" },
+    { id: "msg_agent_1", role: "agent", content: "fork point" },
+  ]);
+  assert.ok(!(result.restoredMessages ?? []).some((message) => /\/fork/.test(message.content)));
 });

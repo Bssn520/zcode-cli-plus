@@ -1,4 +1,4 @@
-import type { CommandCenterApp } from "./types.js";
+import type { CommandCenterApp, CommandCenterForkResult } from "./types.js";
 
 export function formatResumeResult(
   sessionId: string,
@@ -13,4 +13,9 @@ export function formatResumeResult(
 
 export function formatNewSessionResult(sessionId: string): string {
   return `Started new session ${sessionId}.`;
+}
+
+export function formatForkSwitchResult(result: CommandCenterForkResult): string {
+  const title = result.title?.trim() || result.forkedSessionId;
+  return `已 Fork 到新会话：${title}`;
 }

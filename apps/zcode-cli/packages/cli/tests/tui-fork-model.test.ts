@@ -4,7 +4,10 @@ import type { ModelSelection } from "@zcode/shared";
 import type { CommandCenterApp } from "../src/command-center.js";
 import {
   applyForkModelCarryOver,
+  applyForkSessionTitle,
+  formatForkSessionTitle,
   readForkModelCarryOver,
+  switchToForkedSession,
 } from "../src/tui-fork-model.js";
 
 function appWithModel(selection?: ModelSelection): CommandCenterApp & {
@@ -110,4 +113,75 @@ test("applyForkModelCarryOver no-ops without a selection", async () => {
   const forked = appWithModel();
   await applyForkModelCarryOver(forked, undefined);
   assert.deepEqual(forked.writes, []);
+});
+
+test("formatForkSessionTitle uses bracket prefix instead of Fork of", () => {
+  assert.equal(formatForkSessionTitle("执行下 pwd"), "[Fork] 执行下 pwd");
+});
+
+test("applyForkSessionTitle renames via setCustomSessionTitle", async () => {
+  let renamed: string | undefined;
+  const title = await applyForkSessionTitle(
+    {
+      sessionId: "sess_child",
+      setCustomSessionTitle: async (input: { title: string }) => {
+        renamed = input.title;
+      },
+    } as never,
+    "原标题",
+  );
+  assert.equal(title, "[Fork] 原标题");
+  assert.equal(renamed, "[Fork] 原标题");
+});
+
+test("switchToForkedSession carries model and renames child title", async () => {
+  let setModelArgs: unknown;
+  let renamed: string | undefined;
+  let forkOptions: unknown;
+  const result = await switchToForkedSession({
+    activeApp: {
+      sessionId: "sess_parent",
+      getCurrentModelOption: () => ({
+        ref: { providerId: "zai", modelId: "glm-4" },
+        reasoning: { defaultLevel: "high" },
+      }),
+      getThoughtLevel: () => "high",
+      runtime: {
+        sessionStore: {
+          getSession: async () => ({ title: "原标题" }),
+        },
+      },
+      forkFromCheckpoint: async (options) => {
+        forkOptions = options;
+        return {
+          copiedMessageCount: 2,
+          forkedSessionId: "sess_child",
+          response: "Forked session sess_child",
+          restoredFiles: [],
+        };
+      },
+    } as never,
+    forkOptions: { targetMessageId: "msg_a1" },
+    replaceWithForkedApp: async (forkedSessionId) =>
+      ({
+        sessionId: forkedSessionId,
+        setModel: async (selection: unknown) => {
+          setModelArgs = selection;
+          return { model: "glm-4" };
+        },
+        setCustomSessionTitle: async (input: { title: string }) => {
+          renamed = input.title;
+        },
+      }) as never,
+  });
+
+  assert.deepEqual(forkOptions, { targetMessageId: "msg_a1" });
+  assert.equal(result.forkedSessionId, "sess_child");
+  assert.equal(result.title, "[Fork] 原标题");
+  assert.equal(renamed, "[Fork] 原标题");
+  assert.deepEqual(setModelArgs, {
+    providerId: "zai",
+    modelId: "glm-4",
+    options: { reasoningLevel: "high" },
+  });
 });
