@@ -324,6 +324,7 @@ Slash Commands:
         answered: (summary) => `· Answered: ${summary}`,
         bash: (command) => `run ${command}`,
         edit: (path) => `edit ${path}`,
+        exitCode: (code) => `exit code ${code}`,
         failMark: "✗",
         generic: (name) => name,
         glob: (pattern) => `glob ${pattern}`,

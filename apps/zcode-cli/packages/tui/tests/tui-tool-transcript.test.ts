@@ -3,13 +3,51 @@ import test from "node:test";
 import { SessionEventType, type SessionEvent } from "@zcode/contracts";
 import type { Message, ToolTranscriptPart } from "../src/app-model.js";
 import {
+  applyToolPermissionDenial,
   applyToolTranscriptEvent,
   buildToolTranscriptProjection,
 } from "../src/app-tool-transcript.js";
 import { formatToolFilePath } from "../src/app-tool-path-display.js";
 import { ToolTranscriptPartFrame } from "../src/app-tool-components.js";
-import { workToolSummaryLine } from "../src/app-tool-summary.js";
+import { presentToolTranscriptPart, workToolSummaryLine } from "../src/app-tool-summary.js";
 import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
+test("permission denial marks ExitPlanMode as failed", () => {
+  const state: { messages: Message[] } = { messages: [] };
+  const toolNamesById = new Map<string, string>();
+  const handlers = {
+    setMessages: (updater: (current: Message[]) => Message[]) => {
+      state.messages = updater(state.messages);
+    },
+    toolNamesById,
+  };
+
+  applyToolTranscriptEvent(
+    sessionEvent(SessionEventType.ToolCallScheduled, {
+      input: { plan: "# plan" },
+      toolCallId: "call-plan",
+      toolName: "ExitPlanMode",
+    }),
+    handlers as never,
+  );
+  applyToolPermissionDenial(
+    {
+      decision: "deny",
+      reason: "Denied plan in TUI",
+      toolCallId: "call-plan",
+    },
+    handlers as never,
+  );
+
+  const part = onlyToolPart(state.messages);
+  assert.equal(part.status, "failed");
+  assert.equal(part.error, "Denied plan in TUI");
+  assert.deepEqual(presentToolTranscriptPart(part, DEFAULT_TUI_COPY), {
+    errorPrefix: true,
+    kind: "hint",
+    text: "Plan not approved",
+  });
+});
+
 
 test("formats Read paths relative to the workspace", () => {
   assert.equal(
@@ -161,6 +199,7 @@ function createToolProjectionState(workspaceDirectory: string): {
     },
   };
 }
+
 
 function onlyToolPart(messages: Message[]): ToolTranscriptPart {
   const part = messages[0]?.parts?.[0];

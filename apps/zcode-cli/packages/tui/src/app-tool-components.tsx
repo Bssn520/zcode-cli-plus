@@ -25,12 +25,14 @@ export function ToolTranscriptPartView({
   copy = DEFAULT_TUI_COPY,
   part,
   terminalWidth = 100,
+  turnEnded = false,
 }: {
   copy?: TuiCopy;
   part: ToolTranscriptPart;
   terminalWidth?: number;
+  turnEnded?: boolean;
 }): React.ReactElement | null {
-  const presentation = presentToolTranscriptPart(part, copy);
+  const presentation = presentToolTranscriptPart(part, copy, { turnEnded });
   if (presentation.kind === "hidden") return null;
 
   if (presentation.kind === "hint") {

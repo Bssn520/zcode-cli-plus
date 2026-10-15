@@ -321,6 +321,7 @@ Slash Commands:
         answered: (summary) => `· 已回答：${summary}`,
         bash: (command) => `运行 ${command}`,
         edit: (path) => `修改 ${path}`,
+        exitCode: (code) => `退出码 ${code}`,
         failMark: "✗",
         generic: (name) => name,
         glob: (pattern) => `匹配 ${pattern}`,

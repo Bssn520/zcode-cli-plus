@@ -59,6 +59,30 @@ test("renders muted plan/question hints instead of tool chrome", () => {
     presentToolTranscriptPart(tool({ status: "failed", toolName: "ExitPlanMode" }), ZH),
     { errorPrefix: true, kind: "hint", text: "计划未批准" },
   );
+  assert.deepEqual(
+    presentToolTranscriptPart(
+      tool({
+        output: "Denied plan in TUI",
+        status: "pending",
+        toolName: "ExitPlanMode",
+      }),
+      ZH,
+    ),
+    { errorPrefix: true, kind: "hint", text: "计划未批准" },
+  );
+  assert.deepEqual(
+    presentToolTranscriptPart(tool({ status: "pending", toolName: "ExitPlanMode" }), ZH, {
+      turnEnded: true,
+    }),
+    { errorPrefix: true, kind: "hint", text: "计划未批准" },
+  );
+  assert.deepEqual(
+    presentToolTranscriptPart(
+      tool({ status: "cancelled" as ToolTranscriptPart["status"], toolName: "ExitPlanMode" }),
+      ZH,
+    ),
+    { errorPrefix: true, kind: "hint", text: "计划未批准" },
+  );
 
   const rejectedView = ToolTranscriptPartView({
     copy: ZH,
@@ -69,6 +93,41 @@ test("renders muted plan/question hints instead of tool chrome", () => {
   assert.equal(lines[0]?.style.fg, "#fca5a5");
   assert.equal(lines[1]?.text, " 计划未批准");
   assert.equal(lines[1]?.style.fg, "#94a3b8");
+});
+
+test("marks bash non-zero exits as failed summaries", () => {
+  const bash = tool({
+    detailLines: ["command: exit 3"],
+    output: "Exit code 3\n",
+    status: "completed",
+    toolName: "Bash",
+  });
+  assert.equal(workToolSummaryLine(bash, ZH), "· 运行 exit 3 ✗ 退出码 3");
+  assert.equal(workToolSummaryLine(bash, EN), "· run exit 3 ✗ exit code 3");
+  assert.equal(
+    workToolSummaryLine(
+      tool({
+        detailLines: ["command: false"],
+        output: JSON.stringify({ exitCode: 1, status: "failed" }),
+        status: "completed",
+        toolName: "Bash",
+      }),
+      ZH,
+    ),
+    "· 运行 false ✗ 退出码 1",
+  );
+  assert.equal(
+    workToolSummaryLine(
+      tool({
+        detailLines: ["command: true"],
+        output: "ok",
+        status: "completed",
+        toolName: "Bash",
+      }),
+      ZH,
+    ),
+    "· 运行 true ✓",
+  );
 });
 
 test("collapses work tools to one muted summary line by default", () => {

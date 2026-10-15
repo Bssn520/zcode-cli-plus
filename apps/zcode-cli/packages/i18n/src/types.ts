@@ -257,6 +257,7 @@ export interface TuiCopy {
       answered(summary: string): string;
       bash(command: string): string;
       edit(path: string): string;
+      exitCode(code: number): string;
       failMark: string;
       generic(name: string): string;
       glob(pattern: string): string;

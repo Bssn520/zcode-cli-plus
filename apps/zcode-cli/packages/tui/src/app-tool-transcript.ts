@@ -26,6 +26,27 @@ type ToolTranscriptInputProjection = {
   title?: string;
 };
 
+
+export function applyToolPermissionDenial(
+  payload: Record<string, unknown>,
+  handlers: ToolTranscriptHandlers,
+): void {
+  const toolCallId = stringField(payload, "toolCallId");
+  if (!toolCallId) return;
+  const toolName = toolNameFromPayload(payload, handlers.toolNamesById);
+  handlers.setMessages((current) =>
+    updateOrAppendToolPart(
+      current,
+      toolCallId,
+      toolName,
+      {
+        error: stringField(payload, "reason") ?? "Permission denied",
+        status: "failed",
+      },
+      handlers.assistantMessageIdsByToolCallId?.get(toolCallId),
+    ),
+  );
+}
 export function applyToolTranscriptEvent(
   event: SessionEvent,
   handlers: ToolTranscriptHandlers,

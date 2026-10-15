@@ -64,6 +64,7 @@ export function summarizeAskUserAnswers(output: string | undefined): string | un
 export function presentToolTranscriptPart(
   part: ToolTranscriptPart,
   copy: TuiCopy,
+  options?: { turnEnded?: boolean },
 ): ToolRowPresentation {
   if (isEnterPlanModeTool(part.toolName)) {
     return { kind: "hidden" };
@@ -77,7 +78,7 @@ export function presentToolTranscriptPart(
   }
 
   if (isExitPlanModeTool(part.toolName)) {
-    if (part.status === "failed") {
+    if (isExitPlanRejected(part, options?.turnEnded === true)) {
       return {
         errorPrefix: true,
         kind: "hint",
@@ -95,8 +96,12 @@ export function presentToolTranscriptPart(
 
 export function workToolSummaryLine(part: ToolTranscriptPart, copy: TuiCopy): string {
   const body = workToolSummaryBody(part, copy);
-  if (part.status === "failed") {
-    const error = part.error?.trim();
+  const bashExitCode = bashNonZeroExitCode(part);
+  if (part.status === "failed" || bashExitCode !== undefined) {
+    const error =
+      bashExitCode !== undefined
+        ? copy.transcript.tools.exitCode(bashExitCode)
+        : part.error?.trim();
     return error
       ? `· ${body} ${copy.transcript.tools.failMark} ${clipSummary(error)}`
       : `· ${body} ${copy.transcript.tools.failMark}`;
@@ -105,6 +110,52 @@ export function workToolSummaryLine(part: ToolTranscriptPart, copy: TuiCopy): st
     return `· ${body} ${copy.transcript.tools.successMark}`;
   }
   return `· ${body} ${copy.transcript.tools.runningMark}`;
+}
+
+function isExitPlanRejected(part: ToolTranscriptPart, turnEnded: boolean): boolean {
+  const status = part.status as string;
+  if (status === "failed" || status === "denied" || status === "cancelled") return true;
+  if (looksLikePlanDenialText(part.error) || looksLikePlanDenialText(part.output)) return true;
+  // Esc 拒绝常只发 PermissionResolved(deny)，工具行仍停在 pending；轮次结束后不能继续显示等待审批。
+  return turnEnded && (part.status === "pending" || part.status === "running");
+}
+
+function looksLikePlanDenialText(value: string | undefined): boolean {
+  if (!value?.trim()) return false;
+  return (
+    /Denied plan in TUI/i.test(value) ||
+    /plan was not approved/i.test(value) ||
+    /Permission denied for ExitPlanMode/i.test(value)
+  );
+}
+
+function bashNonZeroExitCode(part: ToolTranscriptPart): number | undefined {
+  if (normalizeToolName(part.toolName) !== "bash") return undefined;
+  if (part.status !== "completed" && part.status !== "failed") return undefined;
+
+  const fromOutput = exitCodeFromToolOutput(part.output);
+  if (fromOutput !== undefined) return fromOutput === 0 ? undefined : fromOutput;
+
+  const fromError = exitCodeFromToolOutput(part.error);
+  if (fromError !== undefined) return fromError === 0 ? undefined : fromError;
+
+  return undefined;
+}
+
+function exitCodeFromToolOutput(value: string | undefined): number | undefined {
+  if (!value?.trim()) return undefined;
+  const prefix = value.match(/^Exit code (-?\d+)/u);
+  if (prefix) return Number(prefix[1]);
+
+  try {
+    const parsed = JSON.parse(value) as { exitCode?: unknown };
+    if (typeof parsed.exitCode === "number" && Number.isFinite(parsed.exitCode)) {
+      return parsed.exitCode;
+    }
+  } catch {
+    // live/model content is usually plain text, not JSON
+  }
+  return undefined;
 }
 
 function workToolSummaryBody(part: ToolTranscriptPart, copy: TuiCopy): string {

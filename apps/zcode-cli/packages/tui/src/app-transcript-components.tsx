@@ -219,6 +219,7 @@ export function MessageRow({
               key: `tool-${part.toolCallId}`,
               part,
               terminalWidth,
+              turnEnded: message.streaming !== true,
             }),
           );
         }
