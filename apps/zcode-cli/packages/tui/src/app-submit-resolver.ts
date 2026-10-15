@@ -25,3 +25,8 @@ export function resolveComposerSubmittedText({
   if (slashCommand) return `/${slashCommand.name}`;
   return submittedValue;
 }
+
+export function isQuitSlashCommand(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  return normalized === "/quit" || normalized === "/q";
+}

@@ -11,6 +11,7 @@ import type {
   SubmitValueOptions,
   SlashSelectionState,
 } from "./app-model.js";
+import { isQuitSlashCommand } from "./app-submit-resolver.js";
 import type { TuiOptions, TuiRequestPermission, TuiSubmitPromptResult } from "./types.js";
 
 export function useSubmitValue(input: {
@@ -37,6 +38,7 @@ export function useSubmitValue(input: {
   setStatus: (status: string) => void;
   setStatusDetails: React.Dispatch<React.SetStateAction<string[]>>;
   turnRef: React.MutableRefObject<AbortController | undefined>;
+  onExit: (code: number) => void;
 }): (submittedValue: string, options?: SubmitValueOptions) => Promise<void> {
   return React.useCallback(
     async (submittedValue: string, options: SubmitValueOptions = {}) => {
@@ -44,6 +46,12 @@ export function useSubmitValue(input: {
       const modelSelection = input.resolveSubmittedModel?.(submittedValue);
       if (!text) {
         input.setStatus(input.emptyPromptStatus);
+        return;
+      }
+      if (isQuitSlashCommand(text)) {
+        input.setDraftValue("");
+        input.setDraftAttachments([]);
+        input.onExit(0);
         return;
       }
 

@@ -3,7 +3,7 @@ import type { TuiCopy } from "@zcode/i18n";
 import { palette } from "./app-model.js";
 import {
   focusedMessageActionButton,
-  isForkableAgentMessage,
+  listForkableMessageIndexes,
   type MessageActionsFocusState,
 } from "./app-message-actions-keyboard.js";
 import type { Message } from "./app-model.js";
@@ -14,8 +14,11 @@ const h = React.createElement as (
   ...children: React.ReactNode[]
 ) => React.ReactElement;
 
-export function shouldRenderMessageActionBar(message: Message): boolean {
-  return isForkableAgentMessage(message);
+export function shouldRenderMessageActionBar(
+  messages: readonly Message[],
+  messageIndex: number,
+): boolean {
+  return listForkableMessageIndexes(messages).includes(messageIndex);
 }
 
 export function MessageActionBar({

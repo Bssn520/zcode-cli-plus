@@ -128,31 +128,16 @@ export type QuestionPromptState = {
   multiSelections: Record<string, string[]>;
   otherBuffer: string;
   otherText: Record<string, string>;
-  reviewing: boolean;
   selectedOptionIndex: number;
 };
 
-export type PlanApprovalComment = {
-  id: string;
-  kind: "overall" | "step";
-  stepIndex?: number;
-  stepLabel?: string;
-  text: string;
-};
-
-export type PlanApprovalCommentTarget = { kind: "overall" } | { kind: "step"; stepIndex: number };
-
-export type PlanApprovalMode = "browse" | "comment" | "review";
+export type PlanApprovalFocus = "approve" | "feedback";
 
 export type PlanApprovalState = {
-  commentBuffer: string;
-  comments: PlanApprovalComment[];
-  commentTarget: PlanApprovalCommentTarget | null;
   draftPlan: string;
-  mode: PlanApprovalMode;
+  feedbackBuffer: string;
+  focus: PlanApprovalFocus;
   originalPlan: string;
-  selectedCommentIndex: number;
-  selectedStepIndex: number;
   statusMessage?: string;
 };
 

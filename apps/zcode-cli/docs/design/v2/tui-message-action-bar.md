@@ -37,7 +37,12 @@ Show Fork when:
 - `message.role === "agent"`
 - `message.id` is present (persistent `msg_…`)
 - `message.streaming` is not true
+- the message has assistant text (content or text parts)
+- it is the last such completed agent message in the current user turn
 - not in subagent read-only view
+
+Render the bar under that message's last text part (or content when there are no
+parts), not under trailing tool-only tails or intermediate text.
 
 Global busy disables activation even for historical completed rows.
 
@@ -49,7 +54,7 @@ Global busy disables activation even for historical completed rows.
 
 ## Acceptance
 
-1. Completed agent rows with id show `[ Fork ]`.
+1. Only each turn's final completed agent text row with id shows `[ Fork ]`.
 2. Streaming / missing id / subagent view: no active Fork.
 3. Busy: Fork greyed; Enter/click does not submit.
 4. Keyboard mode enter/move/activate/Esc works as above.

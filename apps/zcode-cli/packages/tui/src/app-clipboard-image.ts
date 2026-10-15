@@ -65,9 +65,10 @@ export function useClipboardImagePaste({
         type: "image",
       };
       setDraftAttachments((current) => [...current, attachment]);
-      if (!insertPlaceholderIntoEditor(inputEditorRef.current, placeholder)) {
-        setDraftValue(appendedImagePlaceholder(getDraftValue(), placeholder));
-      }
+      const next =
+        insertPlaceholderIntoEditor(inputEditorRef.current, placeholder) ??
+        appendedImagePlaceholder(getDraftValue(), placeholder);
+      setDraftValue(next);
       setStatus(`Attached ${placeholder}.`);
     } catch (error) {
       setStatus("Could not read image from clipboard.");
@@ -95,9 +96,10 @@ function appendedImagePlaceholder(draft: string, placeholder: string): string {
 function insertPlaceholderIntoEditor(
   editor: PromptInputEditor | null,
   placeholder: string,
-): boolean {
-  if (!editor) return false;
-  editor.setText(appendedImagePlaceholder(editor.plainText, placeholder));
+): string | undefined {
+  if (!editor) return undefined;
+  const next = appendedImagePlaceholder(editor.plainText, placeholder);
+  editor.setText(next);
   editor.gotoBufferEnd();
-  return true;
+  return next;
 }

@@ -161,6 +161,7 @@ export type TuiSubmitPromptResult = {
   response: string;
   /** Tip/command text format when appended to the transcript. Default markdown. */
   responseFormat?: "markdown" | "plain";
+  exitRequested?: boolean;
   resetSessionProjection?: boolean;
   restoredMessages?: Array<{
     id?: string;

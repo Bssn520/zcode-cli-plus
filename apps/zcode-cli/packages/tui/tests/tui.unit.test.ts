@@ -27,7 +27,8 @@ import {
   formatFileDiffDisplay,
   summarizeToolInput,
 } from "../src/app-tool-transcript.js";
-import { ToolTranscriptPartView } from "../src/app-tool-components.js";
+import { ToolTranscriptPartFrame } from "../src/app-tool-components.js";
+import { workToolSummaryLine } from "../src/app-tool-summary.js";
 import { visibleSlashCommandWindow } from "../src/app-input.js";
 import { createSelectionState } from "../src/app-selection-state.js";
 import { describeSessionEvent, normalizePromptInput } from "../src/state.js";
@@ -560,21 +561,25 @@ test("renders file diff with the Shiki diff renderer", () => {
     ],
   });
 
-  const view = ToolTranscriptPartView({
-    part: {
-      detailLines: [],
-      resultDisplay,
-      status: "completed",
-      title: "Edit packages/tui/src/app.tsx",
-      toolCallId: "call-1",
-      toolName: "Edit",
-      type: "tool",
-    },
+  const part = {
+    detailLines: [],
+    resultDisplay,
+    status: "completed" as const,
+    title: "Edit packages/tui/src/app.tsx",
+    toolCallId: "call-1",
+    toolName: "Edit",
+    type: "tool" as const,
+  };
+  const view = ToolTranscriptPartFrame({
+    expanded: true,
+    onToggle() {},
+    part,
+    summary: workToolSummaryLine(part, EN_COPY),
   });
   const lines = collectTextNodes(view);
   const [diffElement] = collectElementsByType(view, ShikiDiffView);
 
-  assert.equal(lines[0]?.text, "Edit packages/tui/src/app.tsx");
+  assert.equal(lines[0]?.text, "- · edit packages/tui/src/app.tsx ✓");
   assert.equal(
     lines.some((line) => line.text.startsWith("ok Tool")),
     false,
@@ -670,16 +675,20 @@ test("renders wide file diff with split view and no text separator", () => {
     ],
   });
 
-  const view = ToolTranscriptPartView({
-    part: {
-      detailLines: [],
-      resultDisplay,
-      status: "completed",
-      title: "Edit packages/tui/src/app.tsx",
-      toolCallId: "call-1",
-      toolName: "Edit",
-      type: "tool",
-    },
+  const part = {
+    detailLines: [],
+    resultDisplay,
+    status: "completed" as const,
+    title: "Edit packages/tui/src/app.tsx",
+    toolCallId: "call-1",
+    toolName: "Edit",
+    type: "tool" as const,
+  };
+  const view = ToolTranscriptPartFrame({
+    expanded: true,
+    onToggle() {},
+    part,
+    summary: workToolSummaryLine(part, EN_COPY),
     terminalWidth: 140,
   });
   const lines = collectTextNodes(view);

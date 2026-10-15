@@ -4,7 +4,7 @@ import { useKeyboard, usePaste } from "@mbears/opentui-react";
 import { useCallback, useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { handleApprovalKey } from "./app-approval.js";
-import { appendPlanApprovalCommentText } from "./app-plan-approval-state.js";
+import { appendPlanApprovalFeedbackText } from "./app-plan-approval-state.js";
 import { handleSelectionKey } from "./app-input.js";
 import {
   CTRL_C_EXIT_PROMPT,
@@ -153,11 +153,11 @@ export function useTuiKeyboardControls({
     useCallback(
       (event) => {
         const approval = approvalQueue[0];
-        if (!approval?.planApprovalState || approval.planApprovalState.mode !== "comment") {
+        if (!approval?.planApprovalState || approval.planApprovalState.focus !== "feedback") {
           return;
         }
         if (
-          appendPlanApprovalCommentText(decodePasteBytes(event.bytes), approval, setApprovalQueue)
+          appendPlanApprovalFeedbackText(decodePasteBytes(event.bytes), approval, setApprovalQueue)
         ) {
           event.preventDefault();
           event.stopPropagation();

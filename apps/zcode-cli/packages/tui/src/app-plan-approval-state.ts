@@ -2,13 +2,8 @@ import type { PermissionBrokerResult, SupportedLocale } from "@zcode/contracts";
 import type { KeyEvent } from "@mbears/opentui-core";
 import type React from "react";
 import { getZCodeCopy } from "@zcode/i18n";
-import { clampIndex, printableInputText, printableKey } from "./app-input.js";
-import type { ApprovalPrompt, PlanApprovalComment, PlanApprovalState } from "./app-model.js";
-import {
-  editPlanInExternalEditor,
-  normalizePlanText,
-  type SuspendTerminal,
-} from "./app-plan-editor.js";
+import { printableInputText, printableKey } from "./app-input.js";
+import type { ApprovalPrompt, PlanApprovalFocus, PlanApprovalState } from "./app-model.js";
 import {
   activePlanPreviewPageSize,
   scrollActivePlanPreview,
@@ -17,67 +12,26 @@ import {
   openMermaidPreviewInBrowser,
   type MermaidPreviewOpenResult,
 } from "./app-mermaid-preview.js";
-import { parsePlanPreview } from "./app-plan-parse.js";
-let nextCommentId = 1;
 
 export function createPlanApprovalState(plan: string): PlanApprovalState {
   return {
-    commentBuffer: "",
-    comments: [],
-    commentTarget: null,
     draftPlan: plan,
-    mode: "browse",
+    feedbackBuffer: "",
+    focus: "approve",
     originalPlan: plan,
-    selectedCommentIndex: 0,
-    selectedStepIndex: 0,
   };
 }
 
-export function createPlanApprovalResult(input: {
-  locale?: SupportedLocale;
-  requestInput: unknown;
-  state: PlanApprovalState;
-}): PermissionBrokerResult {
-  const modified = isPlanDraftModified(input.state);
-  if (!modified) {
-    return {
-      decision: "allow",
-      reason: "Approved plan in TUI",
-      resolvedAt: new Date(),
-    };
-  }
-
-  const baseInput =
-    input.requestInput && typeof input.requestInput === "object"
-      ? { ...(input.requestInput as Record<string, unknown>) }
-      : {};
+export function createPlanApprovalResult(): PermissionBrokerResult {
   return {
-    decision: "modify",
-    modifiedInput: {
-      ...baseInput,
-      plan: input.state.draftPlan,
-    },
-    reason: modifiedPlanReason(input.locale),
+    decision: "allow",
+    reason: "Approved plan in TUI",
     resolvedAt: new Date(),
   };
 }
 
-export function composePlanFeedbackReason(comments: readonly PlanApprovalComment[]): string {
-  const lines = comments.map((comment) => {
-    if (comment.kind === "step") {
-      const index = (comment.stepIndex ?? 0) + 1;
-      const label = comment.stepLabel?.trim() || `step ${index}`;
-      return `- [step ${index}] ${label}: ${comment.text}`;
-    }
-    return `- [general] ${comment.text}`;
-  });
-  return ["Plan feedback:", ...lines].join("\n");
-}
-
-export function isPlanDraftModified(state: PlanApprovalState): boolean {
-  const draft = normalizePlanText(state.draftPlan);
-  if (draft.length === 0) return false;
-  return draft !== normalizePlanText(state.originalPlan);
+export function composePlanFeedbackReason(feedback: string): string {
+  return ["Plan feedback:", `- [general] ${feedback}`].join("\n");
 }
 
 export function handlePlanApprovalKey(
@@ -86,14 +40,12 @@ export function handlePlanApprovalKey(
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
   setStatus: (status: string) => void,
   options?: {
-    editPlan?: typeof editPlanInExternalEditor;
     locale?: SupportedLocale;
     openMermaidPreview?: (
       markdown: string,
     ) => MermaidPreviewOpenResult | Promise<MermaidPreviewOpenResult>;
     previewPageSize?: number;
     scrollPlanPreview?: (deltaY: number) => void;
-    suspendTerminal?: SuspendTerminal;
   },
 ): void {
   const state = approval.planApprovalState;
@@ -114,15 +66,6 @@ export function handlePlanApprovalKey(
     );
   };
 
-  if (state.mode === "comment") {
-    handleCommentKey(key, update, setStatus);
-    return;
-  }
-  if (state.mode === "review") {
-    handleReviewKey(key, approval, state, update, setApprovalQueue, setStatus, options?.locale);
-    return;
-  }
-
   if (key.name === "escape") {
     resolvePlanApproval(approval, setApprovalQueue, setStatus, {
       decision: "deny",
@@ -132,73 +75,24 @@ export function handlePlanApprovalKey(
     return;
   }
 
-  if (key.name === "return") {
-    // 有评论时 Enter 应发送反馈，不能静默批准丢掉评论文本。
-    if (state.comments.length > 0) {
-      sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus, options?.locale);
-      return;
-    }
-    resolvePlanApproval(
-      approval,
-      setApprovalQueue,
-      setStatus,
-      createPlanApprovalResult({
-        locale: options?.locale,
-        requestInput: approval.request.input,
-        state,
-      }),
-    );
-    return;
-  }
-
-  if (key.ctrl && !key.meta && key.name === "g") {
-    const edit = options?.editPlan ?? editPlanInExternalEditor;
-    const result = edit({
-      plan: state.draftPlan,
-      suspendTerminal: options?.suspendTerminal,
-    });
-    if (result.status === "updated") {
-      update((draft) => {
-        draft.draftPlan = result.plan;
-        draft.selectedStepIndex = 0;
-        draft.statusMessage = undefined;
-      });
-      setStatus("Plan updated from editor.");
-      return;
-    }
-    if (result.status === "empty" || result.status === "unchanged") {
-      update((draft) => {
-        draft.statusMessage = undefined;
-      });
-      setStatus(
-        result.status === "empty"
-          ? "Editor saved empty plan; kept previous draft."
-          : "Plan unchanged.",
-      );
-      return;
-    }
-    const planCopy = getZCodeCopy(options?.locale ?? "en-US").tui.planApproval;
-    const message =
-      result.kind === "not_found"
-        ? planCopy.editorNotFound
-        : planCopy.editorFailed(result.message);
+  if (key.name === "tab" || key.name === "up" || key.name === "down") {
     update((draft) => {
-      draft.statusMessage = message;
-    });
-    setStatus(message);
-    return;
-  }
-
-  // Ephemeral editor hint: dismiss on the next key after Ctrl+G failure.
-  if (state.statusMessage) {
-    update((draft) => {
+      draft.focus = togglePlanApprovalFocus(draft.focus);
       draft.statusMessage = undefined;
     });
+    return;
   }
 
-  const character = printableKey(key)?.toLowerCase();
-  const steps = parsePlanPreview(state.draftPlan).steps;
-  const planCopy = getZCodeCopy(options?.locale ?? "en-US").tui.planApproval;
+  if (key.name === "return") {
+    if (state.focus === "feedback") {
+      const feedback = state.feedbackBuffer.trim();
+      if (!feedback) return;
+      sendPlanApprovalFeedback(approval, feedback, setApprovalQueue, setStatus);
+      return;
+    }
+    resolvePlanApproval(approval, setApprovalQueue, setStatus, createPlanApprovalResult());
+    return;
+  }
 
   if (key.name === "pageup" || key.name === "pagedown") {
     const pageSize = Math.max(1, options?.previewPageSize ?? activePlanPreviewPageSize());
@@ -207,256 +101,99 @@ export function handlePlanApprovalKey(
     return;
   }
 
-  if (key.name === "up" || character === "k") {
-    if (steps.length === 0) return;
-    update((draft) => {
-      draft.selectedStepIndex = clampIndex(draft.selectedStepIndex - 1, steps.length);
-    });
-    return;
-  }
-  if (key.name === "down" || character === "j") {
-    if (steps.length === 0) return;
-    update((draft) => {
-      draft.selectedStepIndex = clampIndex(draft.selectedStepIndex + 1, steps.length);
-    });
-    return;
-  }
-
-  // Leader key map: lowercase only — no e / Shift+f bindings.
-  if (!key.shift && character === "f") {
-    if (steps.length === 0) {
-      setStatus("No steps to comment on.");
-      return;
-    }
-    update((draft) => {
-      draft.mode = "comment";
-      draft.commentBuffer = "";
-      draft.commentTarget = {
-        kind: "step",
-        stepIndex: clampIndex(draft.selectedStepIndex, steps.length),
-      };
-    });
-    setStatus("Type feedback for the selected step. Enter attaches, Esc cancels.");
-    return;
-  }
-
-  if (!key.shift && character === "g") {
-    update((draft) => {
-      draft.mode = "comment";
-      draft.commentBuffer = "";
-      draft.commentTarget = { kind: "overall" };
-    });
-    setStatus("Type overall plan feedback. Enter attaches, Esc cancels.");
-    return;
-  }
-
-  if (!key.shift && character === "o") {
-    void Promise.resolve(
-      (options?.openMermaidPreview ?? openMermaidPreviewInBrowser)(state.draftPlan),
-    ).then((result) => {
-      if (result.kind === "none") {
-        update((draft) => {
-          draft.statusMessage = planCopy.mermaidNone;
-        });
-        setStatus(planCopy.mermaidNone);
-        return;
-      }
-      if (result.kind === "failed") {
-        const message = planCopy.mermaidOpenFailed(result.message);
-        update((draft) => {
-          draft.statusMessage = message;
-        });
-        setStatus(message);
-        return;
-      }
+  if (state.focus === "feedback") {
+    if (key.name === "backspace") {
       update((draft) => {
-        draft.statusMessage = planCopy.mermaidOpened;
+        draft.feedbackBuffer = draft.feedbackBuffer.slice(0, -1);
       });
-      setStatus(planCopy.mermaidOpened);
+      return;
+    }
+    const text = printableInputText(key);
+    if (!text) return;
+    update((draft) => {
+      draft.feedbackBuffer += text;
+      draft.statusMessage = undefined;
     });
     return;
   }
 
-  if (!key.shift && character === "r") {
-    if (state.comments.length === 0) {
-      setStatus("No comments to review.");
+  // Ephemeral status (mermaid open result): dismiss on the next browse key.
+  if (state.statusMessage) {
+    update((draft) => {
+      draft.statusMessage = undefined;
+    });
+  }
+
+  const character = printableKey(key)?.toLowerCase();
+  if (key.shift || character !== "o") return;
+
+  const planCopy = getZCodeCopy(options?.locale ?? "en-US").tui.planApproval;
+  void Promise.resolve(
+    (options?.openMermaidPreview ?? openMermaidPreviewInBrowser)(state.draftPlan),
+  ).then((result) => {
+    if (result.kind === "none") {
+      update((draft) => {
+        draft.statusMessage = planCopy.mermaidNone;
+      });
+      setStatus(planCopy.mermaidNone);
+      return;
+    }
+    if (result.kind === "failed") {
+      const message = planCopy.mermaidOpenFailed(result.message);
+      update((draft) => {
+        draft.statusMessage = message;
+      });
+      setStatus(message);
       return;
     }
     update((draft) => {
-      draft.mode = "review";
-      draft.selectedCommentIndex = 0;
+      draft.statusMessage = planCopy.mermaidOpened;
     });
-    setStatus("Review comments. Enter sends, d deletes, Esc back.");
-  }
-}
-
-function handleCommentKey(
-  key: KeyEvent,
-  update: (recipe: (draft: PlanApprovalState) => void) => void,
-  setStatus: (status: string) => void,
-): void {
-  if (key.name === "escape") {
-    update((draft) => {
-      draft.mode = "browse";
-      draft.commentBuffer = "";
-      draft.commentTarget = null;
-    });
-    setStatus("Comment cancelled.");
-    return;
-  }
-
-  if (key.name === "return") {
-    let attached = false;
-    update((draft) => {
-      const text = draft.commentBuffer.trim();
-      const target = draft.commentTarget;
-      if (!text || !target) return;
-      const steps = parsePlanPreview(draft.draftPlan).steps;
-      const comment: PlanApprovalComment =
-        target.kind === "step"
-          ? {
-              id: `c${nextCommentId++}`,
-              kind: "step",
-              stepIndex: target.stepIndex,
-              stepLabel: steps[target.stepIndex],
-              text,
-            }
-          : {
-              id: `c${nextCommentId++}`,
-              kind: "overall",
-              text,
-            };
-      draft.comments = [...draft.comments, comment];
-      draft.mode = "browse";
-      draft.commentBuffer = "";
-      draft.commentTarget = null;
-      attached = true;
-    });
-    setStatus(attached ? "Comment attached." : "Comment cannot be empty.");
-    return;
-  }
-
-  if (key.name === "backspace") {
-    update((draft) => {
-      draft.commentBuffer = draft.commentBuffer.slice(0, -1);
-    });
-    return;
-  }
-
-  const text = printableInputText(key);
-  if (!text) return;
-  update((draft) => {
-    draft.commentBuffer += text;
+    setStatus(planCopy.mermaidOpened);
   });
 }
 
-export function appendPlanApprovalCommentText(
+export function appendPlanApprovalFeedbackText(
   text: string,
   approval: ApprovalPrompt,
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
 ): boolean {
   const state = approval.planApprovalState;
-  if (!state || state.mode !== "comment") return false;
-  const chunk = normalizeCommentInputText(text);
+  if (!state || state.focus !== "feedback") return false;
+  const chunk = normalizeFeedbackInputText(text);
   if (!chunk) return false;
   setApprovalQueue((current) =>
     current.map((item) => {
       if (item.request.requestId !== approval.request.requestId || !item.planApprovalState) {
         return item;
       }
-      if (item.planApprovalState.mode !== "comment") return item;
+      if (item.planApprovalState.focus !== "feedback") return item;
       const nextState = clonePlanApprovalState(item.planApprovalState);
-      nextState.commentBuffer += chunk;
+      nextState.feedbackBuffer += chunk;
+      nextState.statusMessage = undefined;
       return { ...item, planApprovalState: nextState };
     }),
   );
   return true;
 }
 
-function normalizeCommentInputText(text: string): string {
+function normalizeFeedbackInputText(text: string): string {
   return [...text.replace(/\r\n?/g, "\n")]
     .map((char) => (char === "\n" ? " " : char))
     .filter((char) => char >= " " && char !== "\x7f")
     .join("");
 }
 
-function handleReviewKey(
-  key: KeyEvent,
-  approval: ApprovalPrompt,
-  state: PlanApprovalState,
-  update: (recipe: (draft: PlanApprovalState) => void) => void,
-  setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
-  setStatus: (status: string) => void,
-  locale?: SupportedLocale,
-): void {
-  if (key.name === "escape") {
-    update((draft) => {
-      draft.mode = "browse";
-    });
-    setStatus("Back to plan approval.");
-    return;
-  }
-
-  if (key.name === "return") {
-    if (state.comments.length === 0) {
-      setStatus("No comments to send.");
-      return;
-    }
-    sendPlanApprovalFeedback(approval, state, setApprovalQueue, setStatus, locale);
-    return;
-  }
-
-  const character = printableKey(key)?.toLowerCase();
-  if (key.name === "up" || character === "k") {
-    update((draft) => {
-      draft.selectedCommentIndex = clampIndex(
-        draft.selectedCommentIndex - 1,
-        Math.max(draft.comments.length, 1),
-      );
-    });
-    return;
-  }
-  if (key.name === "down" || character === "j") {
-    update((draft) => {
-      draft.selectedCommentIndex = clampIndex(
-        draft.selectedCommentIndex + 1,
-        Math.max(draft.comments.length, 1),
-      );
-    });
-    return;
-  }
-
-  if (character === "d" || key.name === "delete") {
-    update((draft) => {
-      if (draft.comments.length === 0) return;
-      const index = clampIndex(draft.selectedCommentIndex, draft.comments.length);
-      draft.comments = draft.comments.filter((_, i) => i !== index);
-      draft.selectedCommentIndex = clampIndex(index, Math.max(draft.comments.length, 1));
-      if (draft.comments.length === 0) draft.mode = "browse";
-    });
-    setStatus("Comment deleted.");
-  }
-}
-
 function sendPlanApprovalFeedback(
   approval: ApprovalPrompt,
-  state: PlanApprovalState,
+  feedback: string,
   setApprovalQueue: React.Dispatch<React.SetStateAction<ApprovalPrompt[]>>,
   setStatus: (status: string) => void,
-  locale?: SupportedLocale,
 ): void {
-  let reason = composePlanFeedbackReason(state.comments);
-  // 反馈走 deny，编辑后的计划不会进 modifiedInput；有改动时塞进 reason，避免丢失。
-  if (isPlanDraftModified(state)) {
-    const appendix = getZCodeCopy(locale ?? "en-US").tui.planApproval.feedbackModifiedPlan(
-      state.draftPlan,
-    );
-    reason = `${reason}\n\n${appendix}`;
-  }
   resolvePlanApproval(approval, setApprovalQueue, setStatus, {
     decision: "deny",
     preserveReasonFormatting: true,
-    reason,
+    reason: composePlanFeedbackReason(feedback),
     reasonSource: "plan_approval_feedback",
     resolvedAt: new Date(),
   });
@@ -482,14 +219,10 @@ function resolvePlanApproval(
   );
 }
 
-function modifiedPlanReason(locale: SupportedLocale | undefined): string {
-  return locale === "zh-CN" ? "用户已修改计划" : "user modified the plan";
+function togglePlanApprovalFocus(focus: PlanApprovalFocus): PlanApprovalFocus {
+  return focus === "approve" ? "feedback" : "approve";
 }
 
 function clonePlanApprovalState(state: PlanApprovalState): PlanApprovalState {
-  return {
-    ...state,
-    comments: state.comments.map((comment) => ({ ...comment })),
-    commentTarget: state.commentTarget ? { ...state.commentTarget } : null,
-  };
+  return { ...state };
 }

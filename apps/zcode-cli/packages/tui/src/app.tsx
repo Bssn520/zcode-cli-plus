@@ -146,6 +146,12 @@ export function TuiApp({
     (value: string) => {
       draftRef.current = value;
       setDraftState(value);
+      // 根因：图片粘贴等路径会直接 editor.setText，draft 可能已等于目标值；
+      // React 跳过重渲染时 InputPane 的 value sync effect 不跑，提交/Ctrl+U 清不掉 textarea。
+      const editor = inputEditorRef.current;
+      if (editor && editor.plainText !== value) {
+        editor.setText(value);
+      }
       setDraftAttachments((current) =>
         current.filter((attachment) => value.includes(attachment.placeholder)),
       );
@@ -277,6 +283,7 @@ export function TuiApp({
     setStatus,
     setStatusDetails,
     turnRef: abortControllerRef,
+    onExit,
   });
 
   const pasteClipboardImage = useClipboardImagePaste({
