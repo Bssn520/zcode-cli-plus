@@ -1,10 +1,14 @@
-import { RGBA, StyledText, type TextChunk } from "@mbears/opentui-core";
+import { StyledText } from "@mbears/opentui-core";
 import React from "react";
 import type { ToolResultDisplayHunk, ToolResultDisplayLine } from "./app-model.js";
 import {
   highlightShikiCodeLines,
   type ShikiHighlightSegment,
 } from "./app-shiki-highlighter.js";
+import {
+  styledTextChunk,
+  textChunksFromShikiSegments,
+} from "./app-shiki-text-chunks.js";
 import { activeTuiTheme, type TuiThemeTokens } from "./theme/index.js";
 
 const SPLIT_DIFF_WIDTH_BREAKPOINT = 120;
@@ -12,17 +16,6 @@ const LINE_NUMBER_WIDTH = 4;
 const GUTTER_TRAILING_SPACE = " ";
 const UNIFIED_EMPTY_MARKER = " ";
 const EMPTY_LINE_NUMBER = "";
-const SHIKI_FONT_STYLE_ITALIC = 1;
-const SHIKI_FONT_STYLE_BOLD = 2;
-const SHIKI_FONT_STYLE_UNDERLINE = 4;
-const SHIKI_FONT_STYLE_STRIKETHROUGH = 8;
-const OPENTUI_BOLD_ATTRIBUTE = 1;
-const OPENTUI_ITALIC_ATTRIBUTE = 4;
-const OPENTUI_UNDERLINE_ATTRIBUTE = 8;
-const OPENTUI_STRIKETHROUGH_ATTRIBUTE = 128;
-
-const rgbaCache = new Map<string, RGBA>();
-
 type DiffMarker = "+" | "-" | " ";
 type DiffTone = ToolResultDisplayLine["tone"];
 
@@ -261,26 +254,9 @@ function rowToStyledText(input: {
   const gutterBackground = gutterBackgroundForTone(tone, input.theme);
   const fallbackText = input.row?.content ?? "";
   return new StyledText([
-    styledChunk(gutterText(input.row, input.side), input.theme.diffLineNumber, gutterBackground),
-    ...highlightChunks(input.segments, fallbackText, input.theme.text, rowBackground),
+    styledTextChunk(gutterText(input.row, input.side), input.theme.diffLineNumber, gutterBackground),
+    ...textChunksFromShikiSegments(input.segments, fallbackText, input.theme.text, rowBackground),
   ]);
-}
-
-function highlightChunks(
-  segments: ShikiHighlightSegment[] | undefined,
-  fallbackText: string,
-  fallbackColor: string,
-  background: string,
-): TextChunk[] {
-  if (!segments?.length) return [styledChunk(fallbackText, fallbackColor, background)];
-  return segments.map((segment) =>
-    styledChunk(
-      segment.text,
-      segment.color ?? fallbackColor,
-      background,
-      opentuiAttributesFromShiki(segment.fontStyle),
-    ),
-  );
 }
 
 function truncatedNode(theme: TuiThemeTokens): React.ReactElement {
@@ -343,35 +319,6 @@ function gutterBackgroundForTone(tone: DiffTone, theme: TuiThemeTokens): string 
   return theme.diffContextBg;
 }
 
-function styledChunk(text: string, fg: string, bg: string, attributes = 0): TextChunk {
-  return {
-    __isChunk: true,
-    attributes,
-    bg: rgba(bg),
-    fg: rgba(fg),
-    text,
-  };
-}
-
-function rgba(color: string): RGBA {
-  const cached = rgbaCache.get(color);
-  if (cached) return cached;
-  const parsed = RGBA.fromHex(color);
-  rgbaCache.set(color, parsed);
-  return parsed;
-}
-
-function opentuiAttributesFromShiki(fontStyle: number | undefined): number {
-  if (!fontStyle) return 0;
-  let attributes = 0;
-  if ((fontStyle & SHIKI_FONT_STYLE_BOLD) !== 0) attributes |= OPENTUI_BOLD_ATTRIBUTE;
-  if ((fontStyle & SHIKI_FONT_STYLE_ITALIC) !== 0) attributes |= OPENTUI_ITALIC_ATTRIBUTE;
-  if ((fontStyle & SHIKI_FONT_STYLE_UNDERLINE) !== 0) attributes |= OPENTUI_UNDERLINE_ATTRIBUTE;
-  if ((fontStyle & SHIKI_FONT_STYLE_STRIKETHROUGH) !== 0) {
-    attributes |= OPENTUI_STRIKETHROUGH_ATTRIBUTE;
-  }
-  return attributes;
-}
 
 const h = React.createElement as (
   type: React.ElementType | string,

@@ -374,8 +374,12 @@ Slash Commands:
       commentCount: (count) => `${count} 条意见`,
       help: (commentCount) =>
         commentCount > 0
-          ? `Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 发送意见（${commentCount} 条） · Esc 取消 · j/k 选择`
-          : "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择",
+          ? `Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 发送意见（${commentCount} 条） · Esc 取消 · j/k 选择 · PgUp/PgDn 滚动预览 · o 打开 Mermaid`
+          : "Ctrl+G 编辑 · f 步骤意见 · g 整体意见 · r 审阅 · Enter 批准 · Esc 取消 · j/k 选择 · PgUp/PgDn 滚动预览 · o 打开 Mermaid",
+      mermaidHint: "含 Mermaid：按 o 在浏览器查看",
+      mermaidNone: "当前计划没有 Mermaid 代码块",
+      mermaidOpenFailed: (message) => `无法打开 Mermaid 预览：${message}`,
+      mermaidOpened: "已在浏览器中打开 Mermaid 预览",
       commentStepTitle: (index) => `步骤 ${index} 的意见`,
       commentOverallTitle: "整体计划意见",
       commentHelp: "Enter 挂上 · Esc 返回",

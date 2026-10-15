@@ -6,6 +6,7 @@ import { PlanApprovalPanel, PlanApprovalPanelView } from "../src/app-plan-approv
 import { wrapPlanApprovalHints } from "../src/app-plan-approval-hints.js";
 import { getZCodeCopy } from "@zcode/i18n";
 import { DEFAULT_TUI_COPY } from "../src/app-locale.js";
+import { MarkdownText } from "../src/app-markdown.js";
 import { testRender } from "@mbears/opentui-react/test-utils";
 import React, { act } from "react";
 import type { ApprovalPrompt } from "../src/app-model.js";
@@ -411,7 +412,7 @@ test("plan approval help wraps at hint boundaries on narrow widths", () => {
     assert.deepEqual(panelHelpLines, lines);
   }
 
-  assert.deepEqual(wrapPlanApprovalHints(help, 120), [help]);
+  assert.deepEqual(wrapPlanApprovalHints(help, 160), [help]);
 });
 
 test("plan approval panel stacks rows without overlap in opentui renderer", async () => {
@@ -613,6 +614,93 @@ test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
     assert.equal(failedExit.kind, undefined);
   }
 });
+test("PgDn scrolls preview and Enter still approves", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const scrolls: number[] = [];
+  harness.press("pagedown", {}, {
+    previewPageSize: 7,
+    scrollPlanPreview: (delta) => {
+      scrolls.push(delta);
+    },
+  });
+  assert.deepEqual(scrolls, [7]);
+  harness.press("pageup", {}, {
+    previewPageSize: 7,
+    scrollPlanPreview: (delta) => {
+      scrolls.push(delta);
+    },
+  });
+  assert.deepEqual(scrolls, [7, -7]);
+  harness.press("return");
+  assert.equal(harness.result?.decision, "allow");
+});
+
+test("o opens mermaid preview or reports none", async () => {
+  const withMermaid = createHarness(`${SAMPLE_PLAN}\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`);
+  let opened = false;
+  withMermaid.press(
+    "o",
+    {},
+    {
+      locale: "en-US",
+      openMermaidPreview: async () => {
+        opened = true;
+        return {
+          kind: "opened",
+          htmlPath: "/tmp/preview.html",
+          open: { command: "xdg-open", opened: true },
+        };
+      },
+    },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(opened, true);
+  assert.match(withMermaid.state.statusMessage ?? "", /Opened Mermaid preview/u);
+
+  const without = createHarness(SAMPLE_PLAN);
+  let status = "";
+  without.press(
+    "o",
+    {},
+    {
+      locale: "zh-CN",
+      openMermaidPreview: async () => ({ kind: "none" }),
+    },
+    (next) => {
+      status = next;
+    },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(status, "当前计划没有 Mermaid 代码块");
+  assert.equal(without.state.statusMessage, status);
+});
+
+test("plan preview passes tableOptions and shows mermaid hint", () => {
+  const plan = `${SAMPLE_PLAN}\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`;
+  const state = createPlanApprovalState(plan);
+  const copy = getZCodeCopy("en-US").tui;
+  const node = PlanApprovalPanelView({ copy, state });
+  const markdownNodes = collectElementsOfType(node, MarkdownText);
+  assert.equal(markdownNodes.length, 1);
+  assert.deepEqual(markdownNodes[0]?.props.tableOptions, {
+    style: "grid",
+    widthMode: "content",
+    wrapMode: "word",
+  });
+  const panelText = collectTextNodes(node)
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /Mermaid found: press o to open in browser/u);
+});
+
+test("estimatePlanPreviewRows adds table border rows", async () => {
+  const { estimatePlanPreviewRows } = await import("../src/app-plan-approval-panel.js");
+  const plain = "one\ntwo\nthree";
+  assert.equal(estimatePlanPreviewRows(plain), 3);
+  const table = ["| a | b |", "| --- | --- |", "| 1 | 2 |"].join("\n");
+  assert.equal(estimatePlanPreviewRows(table), 5);
+});
+
 
 function createHarness(plan: string): {
   readonly result: PermissionBrokerResult | undefined;
@@ -733,4 +821,28 @@ function collectTextLines(node: unknown): string[] {
   };
   visit(node);
   return lines;
+}
+
+function collectElementsOfType(
+  node: unknown,
+  type: unknown,
+): Array<{ props: Record<string, unknown> }> {
+  const elements: Array<{ props: Record<string, unknown> }> = [];
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      for (const child of value) visit(child);
+      return;
+    }
+    if (typeof value !== "object" || value === null || !("props" in value)) return;
+    const element = value as {
+      props?: { children?: unknown } & Record<string, unknown>;
+      type?: unknown;
+    };
+    if (element.type === type) {
+      elements.push({ props: element.props ?? {} });
+    }
+    visit(element.props?.children);
+  };
+  visit(node);
+  return elements;
 }

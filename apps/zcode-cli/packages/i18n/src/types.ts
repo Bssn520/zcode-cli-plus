@@ -317,6 +317,10 @@ export interface TuiCopy {
     stepCount(count: number): string;
     commentCount(count: number): string;
     help(commentCount: number): string;
+    mermaidHint: string;
+    mermaidNone: string;
+    mermaidOpenFailed(message: string): string;
+    mermaidOpened: string;
     commentStepTitle(index: number): string;
     commentOverallTitle: string;
     commentHelp: string;
