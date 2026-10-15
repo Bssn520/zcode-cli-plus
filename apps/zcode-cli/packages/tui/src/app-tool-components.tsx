@@ -1,7 +1,10 @@
 import React from "react";
+import type { TuiCopy } from "@zcode/i18n";
 import type { ToolResultDisplayLine, ToolTranscriptPart } from "./app-model.js";
 import { ShikiDiffView, diffViewForWidth } from "./app-shiki-diff-view.js";
+import { DEFAULT_TUI_COPY } from "./app-locale.js";
 import { palette } from "./app-model.js";
+import { presentToolTranscriptPart } from "./app-tool-summary.js";
 import { truncateDisplay } from "./app-terminal-width.js";
 import { activeTuiTheme } from "./theme/index.js";
 
@@ -9,6 +12,8 @@ const MAX_OUTPUT_LINES = 8;
 const OUTPUT_LINE_INDENT_WIDTH = 4;
 const TOOL_DETAIL_INDENT = "  ";
 const TOOL_OUTPUT_LINE_INDENT = "    ";
+const COLLAPSED_MARKER = "+";
+const EXPANDED_MARKER = "-";
 
 const h = React.createElement as (
   type: React.ElementType | string,
@@ -17,19 +22,67 @@ const h = React.createElement as (
 ) => React.ReactElement;
 
 export function ToolTranscriptPartView({
+  copy = DEFAULT_TUI_COPY,
   part,
   terminalWidth = 100,
+  turnEnded = false,
 }: {
+  copy?: TuiCopy;
   part: ToolTranscriptPart;
   terminalWidth?: number;
+  turnEnded?: boolean;
+}): React.ReactElement | null {
+  const presentation = presentToolTranscriptPart(part, copy, { turnEnded });
+  if (presentation.kind === "hidden") return null;
+
+  if (presentation.kind === "hint") {
+    return renderToolHint(copy, presentation);
+  }
+
+  return h(ToolSummaryStateful, {
+    part,
+    summary: presentation.text,
+    terminalWidth,
+  });
+}
+
+function ToolSummaryStateful({
+  part,
+  summary,
+  terminalWidth,
+}: {
+  part: ToolTranscriptPart;
+  summary: string;
+  terminalWidth: number;
 }): React.ReactElement {
-  const statusColor = colorForStatus(part.status);
-  const title = part.title ?? `Tool ${part.toolName} ${part.status}`;
-  const outputLines = part.output ? restoredOutputLines(part.output, terminalWidth) : [];
-  // tool rows should align with assistant text; child detail rows carry their own indent.
+  const [expanded, setExpanded] = React.useState(false);
+  return h(ToolTranscriptPartFrame, {
+    expanded,
+    onToggle: () => setExpanded((current) => !current),
+    part,
+    summary,
+    terminalWidth,
+  });
+}
+
+export function ToolTranscriptPartFrame({
+  expanded,
+  onToggle,
+  part,
+  summary,
+  terminalWidth = 100,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  part: ToolTranscriptPart;
+  summary: string;
+  terminalWidth?: number;
+}): React.ReactElement {
+  const marker = expanded ? EXPANDED_MARKER : COLLAPSED_MARKER;
   return h(
     "box",
     {
+      onMouseUp: onToggle,
       style: {
         backgroundColor: "transparent",
         flexDirection: "column",
@@ -37,7 +90,53 @@ export function ToolTranscriptPartView({
         width: "100%",
       },
     },
-    h("text", { style: { fg: part.title ? palette.muted : statusColor } }, title),
+    h(
+      "text",
+      {
+        selectable: false,
+        style: { fg: palette.muted },
+      },
+      `${marker} ${summary}`,
+    ),
+    ...(expanded ? toolDetailNodes(part, terminalWidth) : []),
+  );
+}
+
+function renderToolHint(
+  copy: TuiCopy,
+  presentation: Extract<ReturnType<typeof presentToolTranscriptPart>, { kind: "hint" }>,
+): React.ReactElement {
+  if (presentation.errorPrefix) {
+    return h(
+      "box",
+      {
+        style: {
+          backgroundColor: "transparent",
+          flexDirection: "row",
+          marginTop: 1,
+          width: "100%",
+        },
+      },
+      h("text", { style: { fg: palette.danger } }, copy.transcript.tools.failMark),
+      h("text", { style: { fg: palette.muted } }, ` ${presentation.text}`),
+    );
+  }
+
+  return h(
+    "text",
+    {
+      style: {
+        fg: palette.muted,
+        marginTop: 1,
+      },
+    },
+    presentation.text,
+  );
+}
+
+function toolDetailNodes(part: ToolTranscriptPart, terminalWidth: number): React.ReactElement[] {
+  const outputLines = part.output ? restoredOutputLines(part.output, terminalWidth) : [];
+  return [
     ...part.detailLines.map((line, index) =>
       h(
         "text",
@@ -75,8 +174,10 @@ export function ToolTranscriptPartView({
           ),
         ]
       : []),
-    ...(part.error ? [h("text", { key: "error", style: { fg: palette.danger } }, part.error)] : []),
-  );
+    ...(part.error
+      ? [h("text", { key: "error", style: { fg: palette.danger } }, part.error)]
+      : []),
+  ];
 }
 
 function resultDisplayNodes(
@@ -102,13 +203,6 @@ function resultDisplayNodes(
       `${TOOL_DETAIL_INDENT}${line.text}`,
     ),
   );
-}
-
-function colorForStatus(status: ToolTranscriptPart["status"]): string {
-  if (status === "completed") return palette.success;
-  if (status === "failed") return palette.danger;
-  if (status === "running") return palette.accent;
-  return palette.warning;
 }
 
 function styleForDiffLine(line: ToolResultDisplayLine): Record<string, string> {

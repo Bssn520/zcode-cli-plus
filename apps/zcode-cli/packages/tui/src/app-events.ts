@@ -24,7 +24,10 @@ import {
 import { applyModelNetworkEvent, applyNetworkRequestEvent } from "./app-network-events.js";
 import { appendSystemErrorMessage } from "./app-transcript-errors.js";
 import { applyTurnCompleteEvent, applyTurnCompleteFallbackResponse } from "./app-turn-complete.js";
-import { applyToolTranscriptEvent } from "./app-tool-transcript.js";
+import {
+  applyToolPermissionDenial,
+  applyToolTranscriptEvent,
+} from "./app-tool-transcript.js";
 import { DEFAULT_TUI_COPY } from "./app-locale.js";
 import { removeQueuedInputs, upsertQueuedInput } from "./app-queued-inputs.js";
 import { applyCompactTimelineEvent, applyCompactTurnErrorEvent } from "./app-compact-timeline.js";
@@ -171,6 +174,13 @@ export function applySessionEventToState(
       handlers.setStatus(
         copy.status.permissionResolved(stringField(payload, "toolName") ?? "tool"),
       );
+      if (stringField(payload, "decision") === "deny") {
+        applyToolPermissionDenial(payload, handlers);
+      }
+      break;
+    case SessionEventType.PermissionDenied:
+      applyToolPermissionDenial(payload, handlers);
+      handlers.setStatus(copy.status.toolFailed(toolLabel(payload, handlers.toolNamesById)));
       break;
     case SessionEventType.SessionResumed:
       handlers.setStatus(copy.status.sessionResumed);

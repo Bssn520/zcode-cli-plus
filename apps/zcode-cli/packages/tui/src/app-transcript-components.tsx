@@ -9,7 +9,10 @@ import {
   MessageActionBar,
   shouldRenderMessageActionBar,
 } from "./app-message-actions.js";
-import type { MessageActionsFocusState } from "./app-message-actions-keyboard.js";
+import {
+  lastTextPartIndex,
+  type MessageActionsFocusState,
+} from "./app-message-actions-keyboard.js";
 import { ThoughtTranscriptPartView } from "./app-thought-components.js";
 import { ToolTranscriptPartView } from "./app-tool-components.js";
 import { WorkflowRunCardView } from "./app-workflow-card.js";
@@ -100,6 +103,7 @@ export function ContentPane({
             message,
             messageActionsFocus:
               messageActionsFocus?.messageIndex === index ? messageActionsFocus : undefined,
+            messages,
             onForkMessage,
             showMessageActions,
             terminalWidth,
@@ -113,8 +117,10 @@ export function MessageRow({
   busy = false,
   copy = DEFAULT_TUI_COPY,
   expandedWorkflowRunIds,
+  index,
   message,
   messageActionsFocus,
+  messages,
   onForkMessage,
   showMessageActions = false,
   terminalWidth = 100,
@@ -126,6 +132,7 @@ export function MessageRow({
   index: number;
   message: Message;
   messageActionsFocus?: MessageActionsFocusState;
+  messages?: Message[];
   onForkMessage?: (messageId: string) => void;
   showMessageActions?: boolean;
   terminalWidth?: number;
@@ -140,6 +147,24 @@ export function MessageRow({
   const rowBackground = isUserMessage ? palette.userMessageBackground : palette.background;
   const assistantText = message.role === "agent";
   const plainTextColor = message.role === "system" ? palette.warning : palette.text;
+  const transcriptMessages = messages ?? [message];
+  const showFork =
+    showMessageActions &&
+    Boolean(message.id) &&
+    shouldRenderMessageActionBar(transcriptMessages, index);
+  const forkAfterPartIndex = showFork ? lastTextPartIndex(message) : -1;
+  const showForkAfterContent = showFork && parts.length === 0 && message.content.trim().length > 0;
+  const forkBar =
+    showFork && message.id
+      ? h(MessageActionBar, {
+          busy,
+          copy,
+          focus: messageActionsFocus,
+          key: "message-actions",
+          messageId: message.id,
+          onFork: onForkMessage,
+        })
+      : null;
 
   return h(
     "box",
@@ -168,56 +193,62 @@ export function MessageRow({
       : parts.length === 0
         ? [h("text", { key: "content", style: { fg: plainTextColor } }, message.content)]
         : []),
-...parts.map((part, partIndex) => {
+    ...(showForkAfterContent && forkBar ? [forkBar] : []),
+    ...parts.flatMap((part, partIndex) => {
+      const nodes: React.ReactElement[] = [];
       if (part.type === "tool") {
         // 卡片 join 按 toolCallId（与 GUI buildWorkflowRunByToolCallId 同规）。命中即渲染实时卡：
         // 工具行自己的 status 在 CreateWorkflow 上会在 run 还在飞的时候就变成 completed
         // （工具一launch完 run 就返回），所以状态必须读镜像，不能读 part.status。
         const workflowCard = workflowCardsByToolCallId?.get(part.toolCallId);
         if (workflowCard) {
-          return h(WorkflowRunCardView, {
-            card: workflowCard,
-            copy,
-            expanded: expandedWorkflowRunIds?.has(workflowCard.runId) ?? false,
-            key: `workflow-${part.toolCallId}`,
-            terminalWidth,
-          });
+          nodes.push(
+            h(WorkflowRunCardView, {
+              card: workflowCard,
+              copy,
+              expanded: expandedWorkflowRunIds?.has(workflowCard.runId) ?? false,
+              key: `workflow-${part.toolCallId}`,
+              terminalWidth,
+            }),
+          );
+        } else {
+          // 无命中就回落今日的文本投影（编过但没有 run、或镜像尚未补种）。
+          nodes.push(
+            h(ToolTranscriptPartView, {
+              copy,
+              key: `tool-${part.toolCallId}`,
+              part,
+              terminalWidth,
+              turnEnded: message.streaming !== true,
+            }),
+          );
         }
-        // 无命中就回落今日的文本投影（编过但没有 run、或镜像尚未补种）。
-        return h(ToolTranscriptPartView, {
-          key: `tool-${part.toolCallId}`,
-          part,
-          terminalWidth,
-        });
-      }
-      if (part.type === "thought") {
-        return h(ThoughtTranscriptPartView, {
-          copy,
-          key: `thought-${partIndex}`,
-          part,
-        });
-      }
-      return assistantText && part.format !== "plain"
-        ? h(MarkdownText, {
-            backgroundColor: rowBackground,
-            content: part.text,
-            key: `text-${partIndex}`,
-            streaming: message.streaming,
-          })
-        : h("text", { key: `text-${partIndex}`, style: { fg: plainTextColor } }, part.text);
-    }),
-    ...(showMessageActions && shouldRenderMessageActionBar(message) && message.id
-      ? [
-          h(MessageActionBar, {
-            busy,
+      } else if (part.type === "thought") {
+        nodes.push(
+          h(ThoughtTranscriptPartView, {
             copy,
-            focus: messageActionsFocus,
-            key: "message-actions",
-            messageId: message.id,
-            onFork: onForkMessage,
+            key: `thought-${partIndex}`,
+            part,
           }),
-        ]
-      : []),
+        );
+      } else {
+        nodes.push(
+          assistantText && part.format !== "plain"
+            ? h(MarkdownText, {
+                backgroundColor: rowBackground,
+                content: part.text,
+                key: `text-${partIndex}`,
+                streaming: message.streaming,
+              })
+            : h("text", { key: `text-${partIndex}`, style: { fg: plainTextColor } }, part.text),
+        );
+      }
+
+      if (forkBar && partIndex === forkAfterPartIndex) {
+        nodes.push(forkBar);
+      }
+      return nodes;
+    }),
   );
 }
 

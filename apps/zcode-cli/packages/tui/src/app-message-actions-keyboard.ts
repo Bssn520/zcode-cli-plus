@@ -17,6 +17,14 @@ export type MessageActionButtonId = "fork";
 
 export const MESSAGE_ACTION_BUTTONS: readonly MessageActionButtonId[] = ["fork"];
 
+export function agentMessageHasText(message: Message | undefined): boolean {
+  if (!message || message.role !== "agent") return false;
+  if (message.content.trim().length > 0) return true;
+  return (message.parts ?? []).some(
+    (part) => part.type === "text" && part.text.trim().length > 0,
+  );
+}
+
 export function isForkableAgentMessage(message: Message | undefined): message is Message & {
   id: string;
   role: "agent";
@@ -26,18 +34,36 @@ export function isForkableAgentMessage(message: Message | undefined): message is
       message.role === "agent" &&
       typeof message.id === "string" &&
       message.id.length > 0 &&
-      message.streaming !== true,
+      message.streaming !== true &&
+      agentMessageHasText(message),
   );
 }
 
 export function listForkableMessageIndexes(messages: readonly Message[]): number[] {
   const indexes: number[] = [];
+  let turnFinal: number | undefined;
   for (let index = 0; index < messages.length; index += 1) {
-    if (isForkableAgentMessage(messages[index])) {
-      indexes.push(index);
+    const message = messages[index];
+    if (message?.role === "user") {
+      if (turnFinal !== undefined) indexes.push(turnFinal);
+      turnFinal = undefined;
+      continue;
+    }
+    if (isForkableAgentMessage(message)) {
+      turnFinal = index;
     }
   }
+  if (turnFinal !== undefined) indexes.push(turnFinal);
   return indexes;
+}
+
+export function lastTextPartIndex(message: Message): number {
+  const parts = message.parts ?? [];
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const part = parts[index];
+    if (part?.type === "text" && part.text.trim().length > 0) return index;
+  }
+  return -1;
 }
 
 export function isMessageActionsHotkey(key: Pick<KeyEvent, "ctrl" | "name" | "shift">): boolean {
