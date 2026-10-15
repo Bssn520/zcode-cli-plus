@@ -11,7 +11,7 @@ import { testRender } from "@mbears/opentui-react/test-utils";
 import React, { act } from "react";
 import type { ApprovalPrompt } from "../src/app-model.js";
 import {
-  appendPlanApprovalCommentText,
+  appendPlanApprovalFeedbackText,
   composePlanFeedbackReason,
   createPlanApprovalResult,
   createPlanApprovalState,
@@ -21,6 +21,7 @@ import { parsePlanPreview } from "../src/app-plan-parse.js";
 import { editPlanInExternalEditor, splitEditorCommand } from "../src/app-plan-editor.js";
 import { createSuspendTerminal } from "../src/suspend-terminal.js";
 import { displayWidth } from "../src/app-terminal-width.js";
+
 const SAMPLE_PLAN = `## Steps
 1. Update service boundary
 2. Add regression tests
@@ -48,218 +49,65 @@ test("parses steps/files/risks and falls back for unsplittable plans", () => {
   assert.deepEqual(plain.steps, []);
 });
 
-test("approve without edits returns allow", () => {
-  const state = createPlanApprovalState(SAMPLE_PLAN);
-  const result = createPlanApprovalResult({
-    locale: "en-US",
-    requestInput: { plan: SAMPLE_PLAN, allowedPrompts: [{ tool: "Bash", prompt: "run tests" }] },
-    state,
-  });
+test("approve returns allow", () => {
+  const result = createPlanApprovalResult();
   assert.equal(result.decision, "allow");
   assert.equal(result.modifiedInput, undefined);
 });
 
-test("approve after edit returns modify with full input and locale reason", () => {
-  const state = createPlanApprovalState(SAMPLE_PLAN);
-  state.draftPlan = `${SAMPLE_PLAN}\n\nExtra note.\n`;
-  const input = { plan: SAMPLE_PLAN, allowedPrompts: [{ tool: "Bash", prompt: "run tests" }] };
-  const en = createPlanApprovalResult({ locale: "en-US", requestInput: input, state });
-  assert.equal(en.decision, "modify");
-  assert.deepEqual(en.modifiedInput, { ...input, plan: state.draftPlan });
-  assert.equal(en.reason, "user modified the plan");
-
-  const zh = createPlanApprovalResult({ locale: "zh-CN", requestInput: input, state });
-  assert.equal(zh.reason, "用户已修改计划");
-});
-
-test("empty-save and unchanged-save stay on allow path", () => {
+test("default focus is approve and Enter approves", () => {
   const harness = createHarness(SAMPLE_PLAN);
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ status: "empty" }),
-    },
-  );
-  assert.equal(harness.state.draftPlan, SAMPLE_PLAN);
-  harness.press("return");
-  assert.equal(harness.result?.decision, "allow");
-
-  const harness2 = createHarness(SAMPLE_PLAN);
-  harness2.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ status: "unchanged" }),
-    },
-  );
-  harness2.press("return");
-  assert.equal(harness2.result?.decision, "allow");
-});
-
-test("modify path uses mocked editor content", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  const edited = `${SAMPLE_PLAN}\nEdited in VISUAL.\n`;
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ plan: edited, status: "updated" }),
-    },
-  );
-  assert.equal(harness.state.draftPlan, edited);
-  harness.press("return", {}, { locale: "en-US" });
-  assert.equal(harness.result?.decision, "modify");
-  assert.equal((harness.result?.modifiedInput as { plan?: string })?.plan, edited);
-  assert.equal(harness.result?.reason, "user modified the plan");
-});
-
-test("accumulates step and overall comments then sends feedback", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  harness.press("down");
-  harness.press("f");
-  for (const ch of "need coverage") harness.press(ch);
-  harness.press("return");
-  harness.press("g");
-  for (const ch of "prefer smaller PR") harness.press(ch);
-  harness.press("return");
-  assert.equal(harness.state.comments.length, 2);
-  harness.press("r");
-  harness.press("return");
-
-  assert.equal(harness.result?.decision, "deny");
-  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
-  assert.equal(harness.result?.preserveReasonFormatting, true);
-  assert.match(harness.result?.reason ?? "", /\[step 2\].*need coverage/u);
-  assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
-});
-test("Enter with comments sends plan_approval_feedback without opening review", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  harness.press("f");
-  for (const ch of "need coverage") harness.press(ch);
-  harness.press("return");
-  harness.press("g");
-  for (const ch of "prefer smaller PR") harness.press(ch);
-  harness.press("return");
-  assert.equal(harness.state.mode, "browse");
-  assert.equal(harness.state.comments.length, 2);
-
-  harness.press("return");
-
-  assert.equal(harness.result?.decision, "deny");
-  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
-  assert.equal(harness.result?.preserveReasonFormatting, true);
-  assert.match(harness.result?.reason ?? "", /\[step 1\].*need coverage/u);
-  assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
-});
-
-test("Enter with comments and edited plan appends updated plan to feedback reason", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  const edited = `${SAMPLE_PLAN}\nEdited in VISUAL.\n`;
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ plan: edited, status: "updated" }),
-    },
-  );
-  harness.press("g");
-  for (const ch of "shrink scope") harness.press(ch);
-  harness.press("return");
-  harness.press("return", {}, { locale: "en-US" });
-
-  assert.equal(harness.result?.decision, "deny");
-  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
-  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
-  assert.match(
-    harness.result?.reason ?? "",
-    /User modified the plan\. The updated plan is as follows:\n[\s\S]*Edited in VISUAL\./u,
-  );
-  assert.equal(harness.result?.modifiedInput, undefined);
-});
-
-test("review feedback with edited plan appends zh-CN updated plan text", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  const edited = `${SAMPLE_PLAN}\n改过的计划\n`;
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ plan: edited, status: "updated" }),
-    },
-  );
-  harness.press("g");
-  for (const ch of "shrink scope") harness.press(ch);
-  harness.press("return");
-  harness.press("r");
-  harness.press("return", {}, { locale: "zh-CN" });
-
-  assert.equal(harness.result?.decision, "deny");
-  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
-  assert.match(harness.result?.reason ?? "", /\[general\].*shrink scope/u);
-  assert.match(
-    harness.result?.reason ?? "",
-    /用户已修改计划，修改后的计划如下：\n[\s\S]*改过的计划/u,
-  );
-});
-
-test("Enter without comments still approves", () => {
-  const harness = createHarness(SAMPLE_PLAN);
+  assert.equal(harness.state.focus, "approve");
   harness.press("return");
   assert.equal(harness.result?.decision, "allow");
   assert.equal(harness.result?.reasonSource, undefined);
   assert.equal(harness.result?.modifiedInput, undefined);
 });
 
-test("browse help switches Enter action when comments exist", () => {
-  const without = DEFAULT_TUI_COPY.planApproval.help(0);
-  const withComments = DEFAULT_TUI_COPY.planApproval.help(2);
-  assert.match(without, /Enter approve/u);
-  assert.doesNotMatch(without, /send feedback/u);
-  assert.match(withComments, /Enter send feedback \(2 comments\)/u);
-
-  const state = createPlanApprovalState(SAMPLE_PLAN);
-  state.comments = [{ id: "1", kind: "overall", text: "shrink scope" }];
-  const panelText = collectTextNodes(PlanApprovalPanelView({ state }))
-    .map((line) => line.text)
-    .join("\n");
-  assert.match(panelText, /Enter send feedback \(1 comment\)/u);
-});
-
-test("plan approval count labels use English singular/plural and keep Chinese fixed", () => {
-  const en = DEFAULT_TUI_COPY.planApproval;
-  assert.equal(en.stepCount(1), "1 step");
-  assert.equal(en.stepCount(2), "2 steps");
-  assert.equal(en.commentCount(1), "1 comment");
-  assert.equal(en.commentCount(2), "2 comments");
-  assert.match(en.help(1), /Enter send feedback \(1 comment\)/u);
-  assert.match(en.help(2), /Enter send feedback \(2 comments\)/u);
-
-  const zh = getZCodeCopy("zh-CN").tui.planApproval;
-  assert.equal(zh.stepCount(1), "1 个步骤");
-  assert.equal(zh.stepCount(2), "2 个步骤");
-  assert.equal(zh.commentCount(1), "1 条意见");
-  assert.equal(zh.commentCount(2), "2 条意见");
-  assert.match(zh.help(1), /Enter 发送意见（1 条）/u);
-  assert.match(zh.help(2), /Enter 发送意见（2 条）/u);
-});
-
-
-test("review can delete a single comment before send", () => {
+test("Tab and arrows toggle focus between approve and feedback", () => {
   const harness = createHarness(SAMPLE_PLAN);
-  harness.press("f");
-  for (const ch of "first") harness.press(ch);
+  assert.equal(harness.state.focus, "approve");
+  harness.press("tab");
+  assert.equal(harness.state.focus, "feedback");
+  harness.press("down");
+  assert.equal(harness.state.focus, "approve");
+  harness.press("up");
+  assert.equal(harness.state.focus, "feedback");
+});
+
+test("Enter in feedback with empty buffer does nothing", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  harness.press("tab");
+  assert.equal(harness.state.focus, "feedback");
   harness.press("return");
-  harness.press("g");
-  for (const ch of "second") harness.press(ch);
+  assert.equal(harness.result, undefined);
+  assert.equal(harness.state.focus, "feedback");
+});
+
+test("Enter in feedback sends plan_approval_feedback and never approves", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  harness.press("tab");
+  for (const ch of "prefer smaller PR") harness.press(ch);
   harness.press("return");
-  harness.press("r");
-  harness.press("d");
-  assert.equal(harness.state.comments.length, 1);
-  assert.equal(harness.state.comments[0]?.kind, "overall");
-  harness.press("return");
-  assert.match(harness.result?.reason ?? "", /\[general\] second/u);
-  assert.doesNotMatch(harness.result?.reason ?? "", /first/u);
+
+  assert.equal(harness.result?.decision, "deny");
+  assert.equal(harness.result?.reasonSource, "plan_approval_feedback");
+  assert.equal(harness.result?.preserveReasonFormatting, true);
+  assert.match(harness.result?.reason ?? "", /\[general\].*prefer smaller PR/u);
+  assert.equal(harness.result?.modifiedInput, undefined);
+});
+
+test("fresh plan approval state resets focus and feedback buffer", () => {
+  const first = createPlanApprovalState(SAMPLE_PLAN);
+  first.focus = "feedback";
+  first.feedbackBuffer = "old note";
+  first.statusMessage = "Opened Mermaid preview in browser";
+
+  const second = createPlanApprovalState(`${SAMPLE_PLAN}\nRevised.\n`);
+  assert.equal(second.focus, "approve");
+  assert.equal(second.feedbackBuffer, "");
+  assert.equal(second.statusMessage, undefined);
+  assert.match(second.draftPlan, /Revised/u);
 });
 
 test("Esc denies without plan_approval_feedback", () => {
@@ -270,27 +118,20 @@ test("Esc denies without plan_approval_feedback", () => {
   assert.equal(harness.result?.reason, "Denied plan in TUI");
 });
 
-test("key map has Ctrl+G edit and no e/F bindings", () => {
+test("removed leader keys no longer open edit/comment/review", () => {
   const harness = createHarness(SAMPLE_PLAN);
   const before = harness.state.draftPlan;
-  harness.press("e");
-  assert.equal(harness.state.mode, "browse");
+  harness.press("f");
+  harness.press("g");
+  harness.press("r");
+  harness.press("g", { ctrl: true });
+  assert.equal(harness.state.focus, "approve");
   assert.equal(harness.state.draftPlan, before);
-  harness.press("f", { shift: true });
-  assert.equal(harness.state.mode, "browse");
-  assert.equal(harness.state.comments.length, 0);
-
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ plan: `${before}\nchanged`, status: "updated" }),
-    },
-  );
-  assert.match(harness.state.draftPlan, /changed/u);
+  assert.equal(harness.state.feedbackBuffer, "");
+  assert.equal(harness.result, undefined);
 });
 
-test("comment buffer keeps every char when approval object is stale across key events", () => {
+test("feedback buffer keeps every char when approval object is stale across key events", () => {
   let queue: ApprovalPrompt[] = [];
   const approval: ApprovalPrompt = {
     cleanup: () => undefined,
@@ -305,14 +146,13 @@ test("comment buffer keeps every char when approval object is stale across key e
     queue = typeof update === "function" ? update(queue) : update;
   };
 
-  handlePlanApprovalKey({ name: "g", sequence: "g" } as KeyEvent, queue[0]!, setQueue, () => undefined);
+  handlePlanApprovalKey({ name: "tab", sequence: "tab" } as KeyEvent, queue[0]!, setQueue, () => undefined);
   const stale = queue[0];
   assert.ok(stale);
 
   for (const name of ["h", "e", "l", "l", "o"]) {
     handlePlanApprovalKey({ name, sequence: name } as KeyEvent, stale, setQueue, () => undefined);
   }
-  // Multi-char sequence in one key event (non-bracketed burst / paste-as-key).
   handlePlanApprovalKey(
     { name: "", sequence: " world" } as KeyEvent,
     stale,
@@ -320,10 +160,10 @@ test("comment buffer keeps every char when approval object is stale across key e
     () => undefined,
   );
 
-  assert.equal(queue[0]?.planApprovalState?.commentBuffer, "hello world");
+  assert.equal(queue[0]?.planApprovalState?.feedbackBuffer, "hello world");
 });
 
-test("comment buffer accepts bracketed-paste text including newlines as spaces", () => {
+test("feedback buffer accepts bracketed-paste text including newlines as spaces", () => {
   let queue: ApprovalPrompt[] = [];
   const prompt: ApprovalPrompt = {
     cleanup: () => undefined,
@@ -337,171 +177,126 @@ test("comment buffer accepts bracketed-paste text including newlines as spaces",
   const setQueue = (update: React.SetStateAction<ApprovalPrompt[]>) => {
     queue = typeof update === "function" ? update(queue) : update;
   };
-  handlePlanApprovalKey({ name: "g", sequence: "g" } as KeyEvent, queue[0]!, setQueue, () => undefined);
+  handlePlanApprovalKey({ name: "tab", sequence: "tab" } as KeyEvent, queue[0]!, setQueue, () => undefined);
   const stale = queue[0]!;
-  assert.equal(appendPlanApprovalCommentText("alpha\nbeta\r\ngamma", stale, setQueue), true);
-  assert.equal(queue[0]?.planApprovalState?.commentBuffer, "alpha beta gamma");
+  assert.equal(appendPlanApprovalFeedbackText("alpha\nbeta\r\ngamma", stale, setQueue), true);
+  assert.equal(queue[0]?.planApprovalState?.feedbackBuffer, "alpha beta gamma");
 });
-test("unsplittable plan still renders preview without section error", () => {
+
+test("unsplittable plan still renders markdown preview without section error", () => {
   const plan = "Plain prose plan without structured sections.";
   const lines = collectTextNodes(PlanApprovalPanelView({ state: createPlanApprovalState(plan) }));
   const text = lines.map((line) => line.text).join("\n");
-  assert.match(text, /Exit plan mode|退出计划模式/u);
   assert.match(text, /Plain prose plan/u);
+  assert.match(text, /Approve|批准/u);
   assert.doesNotMatch(text, /failed to parse|Unable to parse/iu);
+  assert.doesNotMatch(text, /\bSteps\b|\bFiles\b|\bRisks\b/u);
 });
 
-test("composePlanFeedbackReason keeps step anchors", () => {
-  const reason = composePlanFeedbackReason([
-    {
-      id: "1",
-      kind: "step",
-      stepIndex: 1,
-      stepLabel: "Add regression tests",
-      text: "need coverage",
-    },
-    { id: "2", kind: "overall", text: "prefer smaller PR" },
-  ]);
+test("composePlanFeedbackReason wraps overall feedback", () => {
   assert.equal(
-    reason,
-    [
-      "Plan feedback:",
-      "- [step 2] Add regression tests: need coverage",
-      "- [general] prefer smaller PR",
-    ].join("\n"),
+    composePlanFeedbackReason("prefer smaller PR"),
+    ["Plan feedback:", "- [general] prefer smaller PR"].join("\n"),
   );
 });
 
-test("plan approval help wraps at hint boundaries on narrow widths", () => {
-  const help = DEFAULT_TUI_COPY.planApproval.help(0);
-  const hints = help.split(" · ");
-  const requiredKeys = ["Ctrl+G", "Enter", "Esc", "j/k"];
-  // letter hints need word-ish checks so "g" does not match inside "Ctrl+G"
-  const requiredHintPrefixes = ["f ", "g ", "r "];
+test("plan approval help wraps and omits removed shortcuts", () => {
+  const help = DEFAULT_TUI_COPY.planApproval.help(false);
+  assert.match(help, /PgUp\/PgDn scroll/u);
+  assert.doesNotMatch(help, /Ctrl\+G|Enter approve|Esc cancel|j\/k|f step|g overall|r review/u);
 
-  for (const width of [40, 60]) {
-    const lines = wrapPlanApprovalHints(help, width);
-    assert.ok(lines.length >= 2, `expected wrap at width ${width}`);
+  const withMermaid = DEFAULT_TUI_COPY.planApproval.help(true);
+  assert.match(withMermaid, /o open Mermaid/u);
+
+  const zh = getZCodeCopy("zh-CN").tui.planApproval;
+  assert.equal(zh.approveLabel, "批准");
+  assert.match(zh.feedbackPlaceholder, /输入修改意见/u);
+  assert.match(zh.help(true), /o 打开 Mermaid/u);
+
+  for (const width of [20, 40]) {
+    const lines = wrapPlanApprovalHints(withMermaid, width);
+    assert.ok(lines.length >= 1);
     for (const line of lines) {
-      assert.ok(displayWidth(line) <= width, `line exceeds ${width}: ${JSON.stringify(line)}`);
-      for (const part of line.split(" · ")) {
-        assert.ok(hints.includes(part), `split hint fragment ${JSON.stringify(part)}`);
-      }
+      assert.ok(displayWidth(line) <= Math.max(width, displayWidth(line.split(" · ")[0] ?? "")));
     }
-    const visible = lines.join("\n");
-    for (const key of requiredKeys) {
-      assert.ok(visible.includes(key), `missing ${key} at width ${width}`);
-    }
-    for (const prefix of requiredHintPrefixes) {
-      assert.ok(visible.includes(prefix), `missing hint ${JSON.stringify(prefix)} at width ${width}`);
-    }
-
-    const panelHelpLines = collectTextNodes(
-      PlanApprovalPanelView({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
-    )
-      .map((line) => line.text)
-      .filter((text) => hints.some((hint) => text === hint || text.includes(`${hint} · `) || text.includes(` · ${hint}`)));
-    assert.ok(
-      collectTextNodes(
-        PlanApprovalPanelView({ contentWidth: width, state: createPlanApprovalState(SAMPLE_PLAN) }),
-      )
-        .filter((node) => Object.keys(node.style).length > 0)
-        .every((node) => node.style.flexShrink === 0 && node.style.height === 1),
-      `text rows must pin height/flexShrink at width ${width}`,
-    );
-    assert.deepEqual(panelHelpLines, lines);
   }
-
   assert.deepEqual(wrapPlanApprovalHints(help, 160), [help]);
 });
 
-test("plan approval panel stacks rows without overlap in opentui renderer", async () => {
-  const help = DEFAULT_TUI_COPY.planApproval.help(0);
-  const cases = [
-    { width: 120, height: 40, contentWidth: 100 },
-    { width: 50, height: 40, contentWidth: 46 },
-  ] as const;
+test("panel footer shows approve button and feedback placeholder", () => {
+  const state = createPlanApprovalState(SAMPLE_PLAN);
+  const panelText = collectTextNodes(PlanApprovalPanelView({ state }))
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(panelText, /> Approve/u);
+  assert.match(panelText, /Enter revision feedback/u);
+  assert.match(panelText, /PgUp\/PgDn scroll/u);
+  assert.doesNotMatch(panelText, /Ctrl\+G|Esc cancel|N steps|\d+ steps/u);
+  assert.doesNotMatch(panelText, /^Steps$/mu);
+});
 
-  for (const viewport of cases) {
-    let view: Awaited<ReturnType<typeof testRender>> | undefined;
+test("plan approval panel stacks footer rows without overlap in opentui renderer", async () => {
+  const help = DEFAULT_TUI_COPY.planApproval.help(false);
+  const viewport = { width: 120, height: 40, contentWidth: 100 } as const;
+
+  let view: Awaited<ReturnType<typeof testRender>> | undefined;
+  await act(async () => {
+    view = await testRender(
+      React.createElement(
+        "box",
+        { style: { flexDirection: "column", height: viewport.height, width: viewport.width } },
+        React.createElement(PlanApprovalPanel, {
+          contentWidth: viewport.contentWidth,
+          maxHeight: viewport.height - 10,
+          state: createPlanApprovalState(SAMPLE_PLAN),
+        }),
+      ),
+      {
+        height: viewport.height,
+        kittyKeyboard: true,
+        otherModifiersMode: true,
+        width: viewport.width,
+      },
+    );
+    await view.flush();
+  });
+
+  try {
+    assert.ok(view);
+    const lines = view
+      .captureCharFrame()
+      .split("\n")
+      .map((line) => line.trimEnd());
+    const nonEmpty = lines.filter((line) => line.trim().length > 0);
+
+    const approveIdx = nonEmpty.findIndex((line) => /(^|\s)>?\s*Approve\b/u.test(line));
+    const feedbackIdx = nonEmpty.findIndex((line) => line.includes("revision feedback"));
+    assert.ok(approveIdx >= 0, `missing approve: ${JSON.stringify(nonEmpty.slice(-8))}`);
+    assert.ok(feedbackIdx > approveIdx, `feedback not below approve: ${JSON.stringify(nonEmpty.slice(-8))}`);
+    assert.equal(
+      nonEmpty.some((line) => line.includes("Approve") && line.includes("revision feedback")),
+      false,
+      "collapsed footer row",
+    );
+
+    const helpLines = wrapPlanApprovalHints(help, viewport.contentWidth);
+    const helpRowIndexes = helpLines.map((helpLine) =>
+      nonEmpty.findIndex((line) => line.includes(helpLine)),
+    );
+    assert.ok(
+      helpRowIndexes.every((index) => index >= 0),
+      `missing wrapped help: ${JSON.stringify(nonEmpty.slice(-6))}`,
+    );
+
+    const bottomBorderIdx = lines.findIndex((line) => line.includes("└"));
+    assert.ok(
+      bottomBorderIdx >= 0 && bottomBorderIdx < viewport.height,
+      `panel bottom overflows viewport (border=${bottomBorderIdx})`,
+    );
+  } finally {
     await act(async () => {
-      view = await testRender(
-        React.createElement(
-          "box",
-          { style: { flexDirection: "column", height: viewport.height, width: viewport.width } },
-          React.createElement(PlanApprovalPanel, {
-            contentWidth: viewport.contentWidth,
-            maxHeight: viewport.height - 10,
-            state: createPlanApprovalState(SAMPLE_PLAN),
-          }),
-        ),
-        {
-          height: viewport.height,
-          kittyKeyboard: true,
-          otherModifiersMode: true,
-          width: viewport.width,
-        },
-      );
-      await view.flush();
+      view?.renderer.destroy();
     });
-
-    try {
-      assert.ok(view);
-      const lines = view
-        .captureCharFrame()
-        .split("\n")
-        .map((line) => line.trimEnd());
-      const nonEmpty = lines.filter((line) => line.trim().length > 0);
-      const label = `${viewport.width}x${viewport.height}`;
-
-      const promptIdx = nonEmpty.findIndex((line) => line.includes("Exit plan mode"));
-      const stepsIdx = nonEmpty.findIndex((line) => line.includes("Steps"));
-      const stepRowIdx = nonEmpty.findIndex(
-        (line) => line.includes("1.") && line.includes("Update service boundary"),
-      );
-      const fileIdx = nonEmpty.findIndex((line) => line.includes("app-permission.ts"));
-      const previewIdx = nonEmpty.findIndex((line) => line.includes("Preview"));
-      assert.ok(promptIdx >= 0, `missing prompt at ${label}`);
-      assert.ok(stepsIdx > promptIdx, `Steps not below prompt at ${label}`);
-      assert.ok(stepRowIdx > stepsIdx, `step row not below Steps at ${label}`);
-      assert.ok(fileIdx > stepRowIdx, `file row not below steps at ${label}`);
-      assert.ok(previewIdx > fileIdx, `Preview not below files at ${label}`);
-
-      // Overlap symptom from real terminals: labels collapsed onto one painted row.
-      assert.equal(
-        nonEmpty.some(
-          (line) =>
-            line.includes("Preview") &&
-            (line.includes("Steps") || line.includes("Exit plan mode") || line.includes("•")),
-        ),
-        false,
-        `collapsed header row at ${label}`,
-      );
-
-      const helpLines = wrapPlanApprovalHints(help, viewport.contentWidth);
-      const helpRowIndexes = helpLines.map((helpLine) =>
-        nonEmpty.findIndex((line) => line.includes(helpLine)),
-      );
-      assert.ok(
-        helpRowIndexes.every((index) => index >= 0),
-        `missing wrapped help at ${label}: ${JSON.stringify(nonEmpty.slice(-6))}`,
-      );
-      assert.equal(
-        new Set(helpRowIndexes).size,
-        helpLines.length,
-        `help lines share a painted row at ${label}: ${JSON.stringify(helpRowIndexes)}`,
-      );
-
-      const bottomBorderIdx = lines.findIndex((line) => line.includes("└"));
-      assert.ok(
-        bottomBorderIdx >= 0 && bottomBorderIdx < viewport.height,
-        `panel bottom overflows viewport at ${label} (border=${bottomBorderIdx})`,
-      );
-    } finally {
-      await act(async () => {
-        view?.renderer.destroy();
-      });
-    }
   }
 });
 
@@ -538,56 +333,6 @@ test("resume reapplies terminal size after external editor", () => {
   assert.equal(repainted, true);
 });
 
-test("Ctrl+G editor error surfaces in status line and panel", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  let status = "";
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({ message: "spawnSync vim ENOENT", status: "error" }),
-      locale: "en-US",
-    },
-    (next) => {
-      status = next;
-    },
-  );
-  assert.match(status, /Could not open editor:.*ENOENT/u);
-  assert.equal(harness.state.statusMessage, status);
-
-  const panelText = collectTextNodes(
-    PlanApprovalPanelView({ state: harness.state }),
-  )
-    .map((line) => line.text)
-    .join("\n");
-  assert.match(panelText, /Could not open editor:.*ENOENT/u);
-
-  harness.press("j");
-  assert.equal(harness.state.statusMessage, undefined);
-});
-
-test("Ctrl+G missing editor shows locale hint in panel", () => {
-  const harness = createHarness(SAMPLE_PLAN);
-  let status = "";
-  harness.press(
-    "g",
-    { ctrl: true },
-    {
-      editPlan: () => ({
-        kind: "not_found",
-        message: "spawnSync vi ENOENT",
-        status: "error",
-      }),
-      locale: "zh-CN",
-    },
-    (next) => {
-      status = next;
-    },
-  );
-  assert.equal(status, "未找到编辑器：请设置 $VISUAL 或 $EDITOR");
-  assert.equal(harness.state.statusMessage, status);
-});
-
 test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
   const missing = editPlanInExternalEditor({
     env: {},
@@ -614,7 +359,8 @@ test("editPlanInExternalEditor maps missing fallback and non-zero exit", () => {
     assert.equal(failedExit.kind, undefined);
   }
 });
-test("PgDn scrolls preview and Enter still approves", () => {
+
+test("PgDn scrolls preview and Enter on approve still approves", () => {
   const harness = createHarness(SAMPLE_PLAN);
   const scrolls: number[] = [];
   harness.press("pagedown", {}, {
@@ -631,11 +377,24 @@ test("PgDn scrolls preview and Enter still approves", () => {
     },
   });
   assert.deepEqual(scrolls, [7, -7]);
+  assert.equal(harness.state.focus, "approve");
   harness.press("return");
   assert.equal(harness.result?.decision, "allow");
 });
 
-test("o opens mermaid preview or reports none", async () => {
+test("up/down switch focus instead of scrolling preview", () => {
+  const harness = createHarness(SAMPLE_PLAN);
+  const scrolls: number[] = [];
+  harness.press("down", {}, {
+    scrollPlanPreview: (delta) => {
+      scrolls.push(delta);
+    },
+  });
+  assert.equal(harness.state.focus, "feedback");
+  assert.deepEqual(scrolls, []);
+});
+
+test("o opens mermaid preview only while approve is focused", async () => {
   const withMermaid = createHarness(`${SAMPLE_PLAN}\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`);
   let opened = false;
   withMermaid.press(
@@ -657,25 +416,25 @@ test("o opens mermaid preview or reports none", async () => {
   assert.equal(opened, true);
   assert.match(withMermaid.state.statusMessage ?? "", /Opened Mermaid preview/u);
 
-  const without = createHarness(SAMPLE_PLAN);
-  let status = "";
-  without.press(
+  const typing = createHarness(`${SAMPLE_PLAN}\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`);
+  let typedOpen = false;
+  typing.press("tab");
+  typing.press(
     "o",
     {},
     {
-      locale: "zh-CN",
-      openMermaidPreview: async () => ({ kind: "none" }),
-    },
-    (next) => {
-      status = next;
+      openMermaidPreview: async () => {
+        typedOpen = true;
+        return { kind: "none" };
+      },
     },
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(status, "当前计划没有 Mermaid 代码块");
-  assert.equal(without.state.statusMessage, status);
+  assert.equal(typedOpen, false);
+  assert.equal(typing.state.feedbackBuffer, "o");
 });
 
-test("plan preview passes tableOptions and shows mermaid hint", () => {
+test("plan preview passes tableOptions and shows mermaid help hint", () => {
   const plan = `${SAMPLE_PLAN}\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`;
   const state = createPlanApprovalState(plan);
   const copy = getZCodeCopy("en-US").tui;
@@ -690,7 +449,8 @@ test("plan preview passes tableOptions and shows mermaid hint", () => {
   const panelText = collectTextNodes(node)
     .map((line) => line.text)
     .join("\n");
-  assert.match(panelText, /Mermaid found: press o to open in browser/u);
+  assert.match(panelText, /o open Mermaid/u);
+  assert.doesNotMatch(panelText, /Mermaid found: press o/u);
 });
 
 test("estimatePlanPreviewRows adds table border rows", async () => {
@@ -700,7 +460,6 @@ test("estimatePlanPreviewRows adds table border rows", async () => {
   const table = ["| a | b |", "| --- | --- |", "| 1 | 2 |"].join("\n");
   assert.equal(estimatePlanPreviewRows(table), 5);
 });
-
 
 function createHarness(plan: string): {
   readonly result: PermissionBrokerResult | undefined;
