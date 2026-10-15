@@ -402,20 +402,6 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     return 1;
   }
 
-  let modelSelection: RunPromptHeadlessOptions["modelSelection"];
-  let timeoutSeconds: number | undefined;
-  try {
-    if (typeof parsed.values.model === "string") {
-      modelSelection = parseCliModelOption(parsed.values.model);
-    }
-    if (typeof parsed.values.timeout === "string") {
-      timeoutSeconds = parseCliTimeoutSeconds(parsed.values.timeout);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    ctx.stderr.write(`${message}\n`);
-    return 1;
-  }
   const env = prepareCliRuntimeEnv(deps.env ?? process.env);
   const detectedLocale = detectCliLocale(env);
   let outputFormat: GlobalOptions["outputFormat"];
@@ -434,6 +420,41 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     browserExecutable,
     outputFormat,
   );
+
+  let modelSelection: RunPromptHeadlessOptions["modelSelection"];
+  let timeoutSeconds: number | undefined;
+  try {
+    if (typeof parsed.values.model === "string") {
+      modelSelection = parseCliModelOption(parsed.values.model);
+    }
+    if (typeof parsed.values.timeout === "string") {
+      timeoutSeconds = parseCliTimeoutSeconds(parsed.values.timeout);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Headless JSON consumers need the failure on stdout, same shape as prompt-command.
+    if (
+      (typeof parsed.values.prompt === "string" || parsed.values.target !== undefined) &&
+      (options.outputFormat === "json" ||
+        options.outputFormat === "stream-json" ||
+        (options.outputFormat === undefined && options.json))
+    ) {
+      const payload = {
+        type: "result",
+        subtype: "error",
+        is_error: true,
+        error: message,
+      };
+      ctx.stdout.write(
+        options.outputFormat === "stream-json"
+          ? `${JSON.stringify(payload)}\n`
+          : formatJson(payload),
+      );
+    } else {
+      ctx.stderr.write(`${message}\n`);
+    }
+    return 1;
+  }
   const forceMcs = parsed.values["force-mcs"] === true;
   let targetRequest: CliTargetRequest | undefined;
   try {

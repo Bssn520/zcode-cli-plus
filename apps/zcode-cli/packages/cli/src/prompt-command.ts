@@ -96,6 +96,31 @@ const wantsJsonSummary = (options: GlobalOptions): boolean =>
 const wantsEventStream = (options: GlobalOptions): boolean =>
   options.outputFormat === "stream-json";
 
+/** JSON/stream-json headless failures go to stdout so scripts can parse a single channel. */
+const writeHeadlessFailure = (
+  ctx: RunContext,
+  options: GlobalOptions,
+  message: string,
+  extras: { traceId?: string } = {},
+): void => {
+  if (!wantsJsonSummary(options)) {
+    ctx.stderr.write(`Error: ${message}${extras.traceId ? ` (traceId: ${extras.traceId})` : ""}\n`);
+    return;
+  }
+  const payload = {
+    type: "result",
+    subtype: "error",
+    is_error: true,
+    error: message,
+    ...(extras.traceId ? { traceId: extras.traceId } : {}),
+  };
+  if (wantsEventStream(options)) {
+    ctx.stdout.write(`${JSON.stringify(payload)}\n`);
+    return;
+  }
+  ctx.stdout.write(formatJson(payload));
+};
+
 const IMAGE_EXTENSIONS = new Set([".gif", ".jpeg", ".jpg", ".png", ".webp"]);
 const VIDEO_EXTENSIONS = new Set([".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi"]);
 const EMPTY_PROMPT_ERROR = "--prompt requires non-empty text.";
@@ -296,6 +321,10 @@ export const runPrompt = async (
     });
     browserRuntime = createCliHeadlessBrowserRuntime(options, deps);
     if (headlessOptions.noSession) {
+      // 关闭 adapters 的 model-io-*.jsonl；不要设 ZCODE_RUNTIME_ENV=test。
+      process.env.ZCODE_DISABLE_MODEL_IO_RECORD = "1";
+      env.ZCODE_DISABLE_MODEL_IO_RECORD = "1";
+      if (appEnv !== env) appEnv.ZCODE_DISABLE_MODEL_IO_RECORD = "1";
       ephemeralSession = await createEphemeralSessionStore();
     }
     app = await createApp({
@@ -528,8 +557,16 @@ export const runPrompt = async (
       isTimeoutError(abortController.signal.reason);
     const message = error instanceof Error ? error.message : String(error);
     // 超时 abort 常被上层改写成 "Turn was cancelled."，这里单独给出可脚本识别的提示。
-    if (timeoutHit && headlessOptions.timeoutSeconds !== undefined) {
-      ctx.stderr.write(`zcp: timed out after ${headlessOptions.timeoutSeconds}s\n`);
+    const publicMessage =
+      timeoutHit && headlessOptions.timeoutSeconds !== undefined
+        ? `zcp: timed out after ${headlessOptions.timeoutSeconds}s`
+        : message;
+    if (wantsJsonSummary(options)) {
+      writeHeadlessFailure(ctx, options, publicMessage, {
+        ...(traceId ? { traceId } : {}),
+      });
+    } else if (timeoutHit && headlessOptions.timeoutSeconds !== undefined) {
+      ctx.stderr.write(`${publicMessage}\n`);
     } else {
       ctx.stderr.write(`Error: ${message}${traceId ? ` (traceId: ${traceId})` : ""}\n`);
     }
