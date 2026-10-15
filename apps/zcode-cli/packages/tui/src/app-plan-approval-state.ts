@@ -9,8 +9,15 @@ import {
   normalizePlanText,
   type SuspendTerminal,
 } from "./app-plan-editor.js";
+import {
+  activePlanPreviewPageSize,
+  scrollActivePlanPreview,
+} from "./app-plan-preview-scroll.js";
+import {
+  openMermaidPreviewInBrowser,
+  type MermaidPreviewOpenResult,
+} from "./app-mermaid-preview.js";
 import { parsePlanPreview } from "./app-plan-parse.js";
-
 let nextCommentId = 1;
 
 export function createPlanApprovalState(plan: string): PlanApprovalState {
@@ -81,6 +88,11 @@ export function handlePlanApprovalKey(
   options?: {
     editPlan?: typeof editPlanInExternalEditor;
     locale?: SupportedLocale;
+    openMermaidPreview?: (
+      markdown: string,
+    ) => MermaidPreviewOpenResult | Promise<MermaidPreviewOpenResult>;
+    previewPageSize?: number;
+    scrollPlanPreview?: (deltaY: number) => void;
     suspendTerminal?: SuspendTerminal;
   },
 ): void {
@@ -186,6 +198,14 @@ export function handlePlanApprovalKey(
 
   const character = printableKey(key)?.toLowerCase();
   const steps = parsePlanPreview(state.draftPlan).steps;
+  const planCopy = getZCodeCopy(options?.locale ?? "en-US").tui.planApproval;
+
+  if (key.name === "pageup" || key.name === "pagedown") {
+    const pageSize = Math.max(1, options?.previewPageSize ?? activePlanPreviewPageSize());
+    const delta = key.name === "pageup" ? -pageSize : pageSize;
+    (options?.scrollPlanPreview ?? scrollActivePlanPreview)(delta);
+    return;
+  }
 
   if (key.name === "up" || character === "k") {
     if (steps.length === 0) return;
@@ -227,6 +247,33 @@ export function handlePlanApprovalKey(
       draft.commentTarget = { kind: "overall" };
     });
     setStatus("Type overall plan feedback. Enter attaches, Esc cancels.");
+    return;
+  }
+
+  if (!key.shift && character === "o") {
+    void Promise.resolve(
+      (options?.openMermaidPreview ?? openMermaidPreviewInBrowser)(state.draftPlan),
+    ).then((result) => {
+      if (result.kind === "none") {
+        update((draft) => {
+          draft.statusMessage = planCopy.mermaidNone;
+        });
+        setStatus(planCopy.mermaidNone);
+        return;
+      }
+      if (result.kind === "failed") {
+        const message = planCopy.mermaidOpenFailed(result.message);
+        update((draft) => {
+          draft.statusMessage = message;
+        });
+        setStatus(message);
+        return;
+      }
+      update((draft) => {
+        draft.statusMessage = planCopy.mermaidOpened;
+      });
+      setStatus(planCopy.mermaidOpened);
+    });
     return;
   }
 

@@ -382,8 +382,12 @@ Slash Commands:
       commentCount: (count) => `${count} ${count === 1 ? "comment" : "comments"}`,
       help: (commentCount) =>
         commentCount > 0
-          ? `Ctrl+G edit · f step comment · g overall · r review · Enter send feedback (${commentCount} ${commentCount === 1 ? "comment" : "comments"}) · Esc cancel · j/k select`
-          : "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select",
+          ? `Ctrl+G edit · f step comment · g overall · r review · Enter send feedback (${commentCount} ${commentCount === 1 ? "comment" : "comments"}) · Esc cancel · j/k select · PgUp/PgDn scroll preview · o open Mermaid`
+          : "Ctrl+G edit · f step comment · g overall · r review · Enter approve · Esc cancel · j/k select · PgUp/PgDn scroll preview · o open Mermaid",
+      mermaidHint: "Mermaid found: press o to open in browser",
+      mermaidNone: "No Mermaid code blocks in this plan",
+      mermaidOpenFailed: (message) => `Could not open Mermaid preview: ${message}`,
+      mermaidOpened: "Opened Mermaid preview in browser",
       commentStepTitle: (index) => `Feedback on step ${index}`,
       commentOverallTitle: "Overall plan feedback",
       commentHelp: "Enter attaches · Esc back",
