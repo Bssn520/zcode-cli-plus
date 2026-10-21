@@ -15,21 +15,21 @@
     "lint": "oxlint src --no-ignore"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.3.1",
     "@zcode/contracts": "workspace:*",
     "@zcode/core": "workspace:*",
     "@zcode/node-repl-host": "workspace:*",
     "@zcode/shared": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
-    "@types/node": "^24.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@types/node": "^26.6.5",
     "@zcode/adapters": "workspace:*",
     "@zcode/bootstrap": "workspace:*",
-    "esbuild": "^0.25.0",
-    "playwright-core": "1.59.1",
-    "typescript": "^5.9.0",
+    "esbuild": "^0.28.2",
+    "playwright-core": "1.64.1",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.5"
   }
 }
