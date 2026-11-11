@@ -13,11 +13,11 @@
     "lint": "oxlint --config .oxlintrc.json src vite.config.ts"
   },
   "dependencies": {
-    "d3": "^7.9.0"
+    "d3": "^7.9.2"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
-    "typescript": "^6.0.2",
-    "vite": "^8.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
   }
 }
